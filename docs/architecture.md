@@ -61,10 +61,10 @@
 │   ┌──────────────────────────────────┐   ┌───────────────────────────────┐      │
 │   │   namespace: postgres            │   │   namespace: demo-app         │      │
 │   │                                  │   │                               │      │
-│   │   CloudNativePG Operator         │   │   demo-api (Deployment)       │      │
-│   │                                  │   │   ├── 2 replicas              │      │
+│   │   CloudNativePG Operator         │   │   Adminer (Deployment)        │      │
+│   │                                  │   │   ├── 1 replica               │      │
 │   │   Cluster CR                     │   │   ├── envFrom: secret         │      │
-│   │   ├── pg-1  (primary)  ──────────────────► reads/writes Postgres     │      │
+│   │   ├── pg-1  (primary)  ──────────────────► connects to Postgres      │      │
 │   │   ├── pg-2  (replica)            │   │   └── Ingress / Service       │      │
 │   │   └── pg-3  (replica)            │   └───────────────────────────────┘      │
 │   │          │                       │                                          │

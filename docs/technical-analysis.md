@@ -39,6 +39,12 @@ The Terraform code is split into reusable modules (`network`, `node`, `firewall`
 
 Terraform stops at the infrastructure layer. It provisions machines and outputs their IP addresses. It does not install software, configure nodes, or touch the cluster. Everything from OS configuration onward is Ansible's job.
 
+### Important provisioning notes
+
+**Static internal IPs are mandatory.** k3s embeds node identity (etcd membership, certificates, kubelet registration) at bootstrap time. If a VM's internal IP changes after the cluster is formed — even due to a stop/start — the cluster will break and require a full node rejoin. Every GCE node must be provisioned with a reserved static internal IP (`google_compute_address` with `address_type = "INTERNAL"`), not a dynamic one.
+
+**GCS bucket must be force-destroyable.** GCP refuses to delete a non-empty bucket. Set `force_destroy = true` on the backup bucket resource so that `terraform destroy` completes cleanly without manual intervention.
+
 ---
 
 ## Step 2 — Node Configuration and Kubernetes Bootstrap (Ansible)
@@ -131,11 +137,11 @@ Database credentials are not stored in Git. The External Secrets Operator pulls 
 
 ### What it is
 
-A containerised REST API (simple Go or Python service) that connects to the PostgreSQL cluster and exposes a few endpoints that read and write data. Its purpose is to prove end-to-end connectivity: the full stack from Ingress → Service → Pod → PostgreSQL → GCS backup is exercised.
+The requirement is to deploy something that connects to the operator-managed database and is managed via GitOps. No custom application needs to be built. We use **Adminer** — a single, lightweight Docker image that provides a database UI and immediately demonstrates a working Postgres connection. It satisfies the requirement without writing any application code.
 
 ### How it is deployed
 
-The demo app is defined as a Kubernetes `Deployment` and `Service` in `gitops/applications/demo-app/`. Flux reconciles it the same way it reconciles everything else. The database connection string is injected via a Secret (also managed by External Secrets Operator).
+Adminer is defined as a Kubernetes `Deployment` and `Service` in `gitops/applications/demo-app/`. Flux reconciles it the same way it reconciles everything else. The Postgres connection details are injected via environment variables referencing a Secret managed by the External Secrets Operator.
 
 ---
 
@@ -180,6 +186,61 @@ Alertmanager is configured with alerting rules for: primary unavailable, replica
 ```
 
 Each layer depends on the one above it. If you need to rebuild from scratch, you work top to bottom. If you need to change something in production, you change it in Git and let Flux propagate it downward.
+
+---
+
+## CI Pipeline
+
+The CI pipeline has two jobs that run sequentially on push to `main`. Flux handles everything after that autonomously — there is no third job.
+
+```
+  PR opened
+      │
+      ├── terraform fmt + validate + plan   (no apply)
+      ├── ansible-lint
+      └── kubeconform (validate gitops/ manifests)
+
+      All must pass before merge is allowed.
+
+  Merge to main
+      │
+      ├── path: terraform/**
+      │       │
+      │       └── Job 1: terraform apply
+      │               provisions VMs, VPC, firewall,
+      │               GCS bucket, IAM, static IPs
+      │               outputs: node IPs → passed to Job 2
+      │
+      └── path: ansible/**  (or triggered by Job 1 completion)
+              │
+              └── Job 2: ansible-playbook bootstrap.yml
+                      roles/base        (OS, containerd)
+                      roles/kubernetes  (k3s)
+                      roles/security    (hardening)
+                      roles/flux        (Flux install + GitRepository + Kustomization CRs)
+
+  CI is done. Flux takes over.
+      │
+      └── Flux reconciles gitops/ continuously (60s loop)
+              infrastructure/ → operators/postgres/ → applications/demo-app/
+```
+
+### What CI does NOT do
+
+- CI never runs `kubectl apply` directly
+- CI never installs operators or deploys applications — that is Flux's job
+- Changes to `gitops/**` do not trigger any CI job; Flux picks them up automatically on its next reconcile loop
+- There is no manual `flux bootstrap` step — it is handled by the Ansible `flux` role in Job 2
+
+### PR validation gates
+
+| Check | Tool | Blocks merge |
+|---|---|---|
+| Terraform formatting | `terraform fmt -check` | Yes |
+| Terraform validity | `terraform validate` | Yes |
+| Terraform plan | `terraform plan` | Yes (on error) |
+| Ansible lint | `ansible-lint` | Yes |
+| Manifest validation | `kubeconform` | Yes |
 
 ---
 
