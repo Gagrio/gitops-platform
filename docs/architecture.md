@@ -22,8 +22,8 @@
                 │              │ roles/base                 │
                 │              │ roles/kubernetes  (k3s)    │
                 │              │ roles/security             │
-                │              │ roles/flux        (bootstrap)
-                │              └───────────────────────────-┘
+                │              │ roles/flux   (bootstrap)   │
+                │              └───────┬────────────────────┘
                 ▼                      ▼
 ┌──────────────────────────────────────────────────────────┐
 │                      GOOGLE CLOUD (GCE)                  │
