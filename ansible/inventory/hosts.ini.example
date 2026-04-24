@@ -1,0 +1,13 @@
+# Example inventory — CI generates the real hosts.ini from Terraform output.
+# Structure mirrors how the CI script builds it using `terraform output -json`.
+
+[control]
+dev-node-01 ansible_host=10.0.0.X
+
+[workers]
+dev-node-02 ansible_host=10.0.0.Y
+dev-node-03 ansible_host=10.0.0.Z
+
+[k3s_cluster:children]
+control
+workers

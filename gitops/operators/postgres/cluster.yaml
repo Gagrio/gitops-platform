@@ -1,0 +1,74 @@
+---
+# CloudNativePG Cluster — 3-instance HA PostgreSQL
+# Superuser and replication credentials come from Kubernetes Secrets populated by ESO.
+# Backups go to the GCS bucket created by the gcs Terraform module.
+# ${ENVIRONMENT} and ${GCP_PROJECT_ID} are substituted by Flux from cluster-vars ConfigMap.
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: pg
+  namespace: postgres
+spec:
+  instances: 3
+
+  # PostgreSQL version
+  imageName: ghcr.io/cloudnative-pg/postgresql:16
+
+  # Credentials — all sourced from Secrets populated by External Secrets Operator
+  superuserSecret:
+    name: pg-superuser-password
+
+  # Dedicated app user with its own database
+  bootstrap:
+    initdb:
+      database: app
+      owner: app
+      secret:
+        name: pg-app-password
+
+  # Replication slot authentication
+  replicationSlots:
+    highAvailability:
+      enabled: true
+
+  postgresql:
+    parameters:
+      max_connections: "200"
+      shared_buffers: "256MB"
+      effective_cache_size: "768MB"
+      work_mem: "4MB"
+      maintenance_work_mem: "64MB"
+      wal_level: logical
+
+  # Storage — one PVC per instance
+  storage:
+    size: 20Gi
+    storageClass: local-path
+
+  # GCS backups — uses the node SA (attached to GCE instances) for authentication
+  backup:
+    barmanObjectStore:
+      destinationPath: "gs://${ENVIRONMENT}-${GCP_PROJECT_ID}-pg-backups"
+      googleCredentials:
+        # Uses the GCE instance metadata server (node SA has storage.objectAdmin on the bucket)
+        gkeEnvironment: false
+      wal:
+        compression: gzip
+        maxParallel: 2
+      data:
+        compression: gzip
+        immediateCheckpoint: false
+    retentionPolicy: "30d"
+
+  # Monitoring — expose metrics for Prometheus
+  monitoring:
+    enablePodMonitor: true
+
+  # Ensure pods spread across different nodes for HA
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: kubernetes.io/hostname
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels:
+          cnpg.io/cluster: pg

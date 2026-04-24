@@ -1,0 +1,14 @@
+---
+security_packages:
+  - ufw
+  - fail2ban
+
+# UFW — only the ports k3s and ingress actually need
+ufw_rules:
+  - { rule: allow, port: 22, proto: tcp, comment: SSH }
+  - { rule: allow, port: 6443, proto: tcp, comment: "k3s API server" }
+  - { rule: allow, port: 80, proto: tcp, comment: "HTTP ingress" }
+  - { rule: allow, port: 443, proto: tcp, comment: "HTTPS ingress" }
+  - { rule: allow, port: 10250, proto: tcp, comment: "kubelet" }
+  - { rule: allow, port: 8472, proto: udp, comment: "Flannel VXLAN" }
+  - { rule: allow, port: 51820, proto: udp, comment: "WireGuard (unused, reserved)" }

@@ -1,0 +1,17 @@
+# Variables shared across all nodes.
+# Environment-specific values (k3s_version, flux_version, etc.) are set here
+# and overridden per-environment via extra-vars in CI if needed.
+
+ansible_user: ansible
+ansible_ssh_private_key_file: ~/.ssh/enclaive-ci
+
+# k3s
+k3s_version: "v1.29.3+k3s1"
+k3s_config_dir: /etc/rancher/k3s
+
+# Flux
+flux_version: "2.2.3"
+flux_namespace: flux-system
+github_owner: Gagrio
+github_repo: enclaive-platform-challenge
+gitops_path: gitops

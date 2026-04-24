@@ -1,0 +1,9 @@
+---
+base_packages:
+  - curl
+  - apt-transport-https
+  - ca-certificates
+  - gnupg
+  - open-iscsi   # required by Longhorn / block storage if added later
+  - nfs-common   # NFS mounts
+  - jq

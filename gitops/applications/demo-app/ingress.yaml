@@ -1,0 +1,22 @@
+---
+# Ingress — exposes Adminer via ingress-nginx.
+# Access via http://<node-external-ip> after port-forwarding, or via the LoadBalancer IP.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: adminer
+  namespace: demo-app
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+spec:
+  ingressClassName: nginx
+  rules:
+    - http:
+        paths:
+          - path: /adminer
+            pathType: Prefix
+            backend:
+              service:
+                name: adminer
+                port:
+                  name: http

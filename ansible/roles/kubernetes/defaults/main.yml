@@ -1,0 +1,14 @@
+---
+k3s_role: worker   # overridden per play: control or worker
+k3s_install_url: "https://get.k3s.io"
+
+# Control plane flags — no Traefik (we use ingress-nginx via Flux), no local-path (we use CNPG for storage)
+k3s_server_args: >-
+  --disable traefik
+  --disable servicelb
+  --write-kubeconfig-mode 644
+  --cluster-cidr 10.42.0.0/16
+  --service-cidr 10.43.0.0/16
+
+# Worker flags — points back to control plane; k3s_url and k3s_token set dynamically
+k3s_agent_args: ""

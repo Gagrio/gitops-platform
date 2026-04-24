@@ -1,0 +1,34 @@
+---
+# Bootstrap playbook — run by CI after `terraform apply` completes.
+# Installs k3s, hardens the nodes, and bootstraps Flux onto the control plane.
+# Idempotent: safe to re-run on updates.
+
+- name: Base system setup
+  hosts: k3s_cluster
+  become: true
+  gather_facts: true
+  roles:
+    - base
+    - security
+
+- name: Install k3s control plane
+  hosts: control
+  become: true
+  roles:
+    - role: kubernetes
+      vars:
+        k3s_role: control
+
+- name: Install k3s workers
+  hosts: workers
+  become: true
+  roles:
+    - role: kubernetes
+      vars:
+        k3s_role: worker
+
+- name: Bootstrap Flux
+  hosts: control
+  become: true
+  roles:
+    - flux

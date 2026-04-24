@@ -1,0 +1,133 @@
+---
+# Runs on every merge to main that touches Terraform or Ansible.
+# Applies infrastructure changes and bootstraps the cluster.
+# Application changes go through Flux — no CI job needed for those.
+name: Deploy
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "terraform/**"
+      - "ansible/**"
+
+permissions:
+  contents: read
+  id-token: write  # required for Workload Identity Federation
+
+jobs:
+  terraform-apply:
+    name: Terraform Apply
+    runs-on: ubuntu-latest
+    environment: dev
+    outputs:
+      node_external_ips: ${{ steps.tf-output.outputs.node_external_ips }}
+      gcp_project_id: ${{ steps.tf-output.outputs.gcp_project_id }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Set up Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "~1.7"
+          terraform_wrapper: false
+
+      - name: Terraform init
+        working-directory: terraform/environments/dev
+        run: |
+          terraform init \
+            -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+            -backend-config="prefix=environments/dev"
+
+      - name: Terraform apply
+        working-directory: terraform/environments/dev
+        run: |
+          terraform apply -auto-approve \
+            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
+            -var="region=${{ secrets.GCP_REGION }}" \
+            -var="admin_cidr=${{ secrets.ADMIN_CIDR }}" \
+            -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}"
+
+      - name: Generate Ansible inventory from Terraform output
+        id: tf-output
+        working-directory: terraform/environments/dev
+        run: |
+          EXTERNAL_IPS=$(terraform output -json node_external_ips)
+          echo "node_external_ips=$EXTERNAL_IPS" >> "$GITHUB_OUTPUT"
+          python3 - "$EXTERNAL_IPS" <<'PYEOF'
+          import json, sys
+          ips = json.loads(sys.argv[1])
+          control = {k: v for k, v in ips.items() if "01" in k}
+          workers = {k: v for k, v in ips.items() if "01" not in k}
+          lines = ["[control]"]
+          for name, ip in control.items():
+              lines.append(f"{name} ansible_host={ip}")
+          lines += ["", "[workers]"]
+          for name, ip in workers.items():
+              lines.append(f"{name} ansible_host={ip}")
+          lines += ["", "[k3s_cluster:children]", "control", "workers"]
+          inventory = "\n".join(lines) + "\n"
+          with open("../../../ansible/inventory/hosts.ini", "w") as f:
+              f.write(inventory)
+          print(inventory)
+          PYEOF
+
+      - name: Upload inventory as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ansible-inventory
+          path: ansible/inventory/hosts.ini
+
+  ansible-bootstrap:
+    name: Ansible Bootstrap
+    runs-on: ubuntu-latest
+    needs: terraform-apply
+    environment: dev
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download inventory artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: ansible-inventory
+          path: ansible/inventory
+
+      - name: Install Ansible
+        run: |
+          pip install ansible==9.4.0
+          ansible-galaxy collection install -r ansible/requirements.yml
+
+      - name: Write SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/enclaive-ci
+          chmod 600 ~/.ssh/enclaive-ci
+
+      - name: Wait for SSH to be available on all nodes
+        run: |
+          for ip in $(grep 'ansible_host=' ansible/inventory/hosts.ini | awk -F= '{print $2}'); do
+            echo "Waiting for SSH on $ip..."
+            timeout 120 bash -c "until ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci ansible@$ip 'echo ok' 2>/dev/null; do sleep 5; done"
+          done
+
+      - name: Run bootstrap playbook
+        working-directory: ansible
+        run: |
+          ansible-playbook playbooks/bootstrap.yml \
+            --extra-vars "gcp_project_id=${{ secrets.GCP_PROJECT_ID }} environment=dev github_token=${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Upload kubeconfig artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: kubeconfig-enclaive-dev
+          path: /tmp/kubeconfig-enclaive-dev
+          retention-days: 7

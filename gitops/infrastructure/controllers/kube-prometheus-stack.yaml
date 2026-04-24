@@ -1,0 +1,60 @@
+---
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: kube-prometheus-stack
+  namespace: monitoring
+spec:
+  interval: 1h
+  chart:
+    spec:
+      chart: kube-prometheus-stack
+      version: ">=57.0.0 <70.0.0"
+      sourceRef:
+        kind: HelmRepository
+        name: prometheus-community
+        namespace: flux-system
+      interval: 24h
+  values:
+    grafana:
+      adminPassword: prom-operator
+      persistence:
+        enabled: false
+      dashboardProviders:
+        dashboardproviders.yaml:
+          apiVersion: 1
+          providers:
+            - name: default
+              orgId: 1
+              folder: ""
+              type: file
+              disableDeletion: false
+              editable: true
+              options:
+                path: /var/lib/grafana/dashboards/default
+      dashboards:
+        default:
+          # CloudNativePG dashboard — ID from grafana.com
+          cloudnativepg:
+            gnetId: 20417
+            revision: 1
+            datasource: Prometheus
+    prometheus:
+      prometheusSpec:
+        retention: 7d
+        resources:
+          requests:
+            memory: 512Mi
+    alertmanager:
+      enabled: false
+    # Scrape CloudNativePG metrics via its ServiceMonitor
+    additionalServiceMonitors:
+      - name: cloudnativepg
+        selector:
+          matchLabels:
+            cnpg.io/cluster: pg
+        namespaceSelector:
+          matchNames:
+            - postgres
+        endpoints:
+          - port: metrics

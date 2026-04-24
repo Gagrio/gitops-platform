@@ -68,11 +68,9 @@ Both commands open a browser window to sign in with your Google account. Find yo
 You need the repository locally before you can run the bootstrap Terraform in step 1.4:
 
 ```bash
-git clone https://github.com/<your-github-username>/enclaive-platform-challenge.git
+git clone https://github.com/Gagrio/enclaive-platform-challenge
 cd enclaive-platform-challenge
 ```
-
-Replace `<your-github-username>` with your GitHub username (or the org name if you forked it to an organisation).
 
 ---
 

@@ -1,0 +1,45 @@
+---
+# Adminer — lightweight database UI for verifying the PostgreSQL connection end-to-end
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: adminer
+  namespace: demo-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: adminer
+  template:
+    metadata:
+      labels:
+        app: adminer
+    spec:
+      containers:
+        - name: adminer
+          image: adminer:4.8.1
+          ports:
+            - containerPort: 8080
+          env:
+            - name: ADMINER_DEFAULT_SERVER
+              value: postgres-rw.postgres.svc.cluster.local
+          resources:
+            requests:
+              cpu: 50m
+              memory: 64Mi
+            limits:
+              cpu: 200m
+              memory: 128Mi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: adminer
+  namespace: demo-app
+spec:
+  selector:
+    app: adminer
+  ports:
+    - name: http
+      port: 80
+      targetPort: 8080

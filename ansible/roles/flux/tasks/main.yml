@@ -1,0 +1,94 @@
+---
+- name: Download Flux CLI
+  ansible.builtin.get_url:
+    url: "https://github.com/fluxcd/flux2/releases/download/v{{ flux_version }}/flux_{{ flux_version }}_linux_amd64.tar.gz"
+    dest: /tmp/flux.tar.gz
+    mode: "0644"
+
+- name: Extract Flux CLI
+  ansible.builtin.unarchive:
+    src: /tmp/flux.tar.gz
+    dest: /usr/local/bin
+    remote_src: true
+    include:
+      - flux
+
+- name: Make Flux CLI executable
+  ansible.builtin.file:
+    path: /usr/local/bin/flux
+    mode: "0755"
+
+- name: Wait for k3s API server to be reachable
+  ansible.builtin.wait_for:
+    host: 127.0.0.1
+    port: 6443
+    timeout: 120
+
+- name: Wait for all nodes to be Ready
+  ansible.builtin.shell: |
+    kubectl --kubeconfig={{ kubeconfig_path }} wait node --all \
+      --for=condition=Ready --timeout=120s
+  changed_when: false
+
+- name: Check if Flux is already bootstrapped
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig={{ kubeconfig_path }}
+      - get
+      - namespace
+      - "{{ flux_namespace }}"
+  register: flux_ns_check
+  failed_when: false
+  changed_when: false
+
+- name: Bootstrap Flux (first run)
+  ansible.builtin.command:
+    argv:
+      - flux
+      - bootstrap
+      - github
+      - --kubeconfig={{ kubeconfig_path }}
+      - --owner={{ github_owner }}
+      - --repository={{ github_repo }}
+      - --branch={{ gitops_branch }}
+      - --path={{ gitops_path }}
+      - --personal
+      - --token-auth
+  environment:
+    GITHUB_TOKEN: "{{ github_token }}"
+    KUBECONFIG: "{{ kubeconfig_path }}"
+  when: flux_ns_check.rc != 0
+
+- name: Ensure flux-system namespace exists
+  ansible.builtin.command:
+    argv:
+      - kubectl
+      - --kubeconfig={{ kubeconfig_path }}
+      - get
+      - namespace
+      - "{{ flux_namespace }}"
+  changed_when: false
+
+# cluster-vars ConfigMap supplies ${GCP_PROJECT_ID} and ${ENVIRONMENT} to Flux
+# post-build variable substitution — used by infrastructure, postgres, and demo-app Kustomizations
+- name: Create cluster-vars ConfigMap for Flux substitution
+  ansible.builtin.shell: |
+    kubectl --kubeconfig={{ kubeconfig_path }} apply -f - <<'EOF'
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: cluster-vars
+      namespace: {{ flux_namespace }}
+    data:
+      GCP_PROJECT_ID: "{{ gcp_project_id }}"
+      ENVIRONMENT: "{{ environment }}"
+    EOF
+  changed_when: true
+
+- name: Copy kubeconfig for CI artifact upload
+  ansible.builtin.copy:
+    src: "{{ kubeconfig_path }}"
+    dest: "{{ kubeconfig_artifact_path }}"
+    remote_src: true
+    mode: "0600"
