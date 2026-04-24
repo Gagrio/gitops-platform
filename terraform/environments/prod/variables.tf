@@ -37,17 +37,3 @@ variable "ssh_public_key" {
   sensitive = true
 }
 
-variable "pg_superuser_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "pg_app_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "pg_replication_password" {
-  type      = string
-  sensitive = true
-}

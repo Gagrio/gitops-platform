@@ -39,17 +39,3 @@ variable "ssh_public_key" {
   description = "SSH public key injected into all nodes for Ansible access"
 }
 
-variable "pg_superuser_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "pg_app_password" {
-  type      = string
-  sensitive = true
-}
-
-variable "pg_replication_password" {
-  type      = string
-  sensitive = true
-}
