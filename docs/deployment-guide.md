@@ -63,7 +63,20 @@ Both commands open a browser window to sign in with your Google account. Find yo
 
 ---
 
-### 1.2 Create the Terraform State Bucket
+### 1.2 Clone the Repository
+
+You need the repository locally before you can run the bootstrap Terraform in step 1.4:
+
+```bash
+git clone https://github.com/<your-github-username>/enclaive-platform-challenge.git
+cd enclaive-platform-challenge
+```
+
+Replace `<your-github-username>` with your GitHub username (or the org name if you forked it to an organisation).
+
+---
+
+### 1.3 Create the Terraform State Bucket
 
 This is the only resource created outside of Terraform. It must exist before `terraform init` can run. Choose a globally unique name — a good convention is `<project-id>-tfstate`:
 
@@ -78,7 +91,7 @@ gcloud storage buckets create gs://${PROJECT_ID}-tfstate \
 
 ---
 
-### 1.3 Generate an SSH Key Pair for CI
+### 1.4 Generate an SSH Key Pair for CI
 
 CI uses this key to SSH into the nodes and run Ansible. Generate a dedicated key pair — do not reuse a personal key:
 
@@ -88,13 +101,14 @@ ssh-keygen -t rsa -b 4096 -f ~/.ssh/enclaive-ci -N ""
 
 This creates:
 - `~/.ssh/enclaive-ci` — the **private key** (you will add this to GitHub secrets manually in step 1.6)
+
 - `~/.ssh/enclaive-ci.pub` — the **public key** (goes into the bootstrap Terraform variables)
 
 The private key is never passed through Terraform — it is the only secret you enter manually. This keeps it out of Terraform state entirely.
 
 ---
 
-### 1.4 Configure and Run the Bootstrap Terraform
+### 1.5 Configure and Run the Bootstrap Terraform
 
 The bootstrap Terraform module creates everything else automatically:
 - Enables all required GCP APIs
@@ -149,7 +163,7 @@ Type `yes` when prompted. This takes about 1 minute. When complete, all GitHub A
 
 ---
 
-### 1.5 Add the SSH Private Key to GitHub Manually
+### 1.6 Add the SSH Private Key to GitHub Manually
 
 This is the only secret you enter manually. Go to your repository on GitHub → **Settings → Secrets and variables → Actions → New repository secret**.
 
