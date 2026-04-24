@@ -1,3 +1,9 @@
+# Environment: prod
+# Wires all modules together for the production environment. Uses e2-standard-4 nodes
+# for additional headroom, a 90-day backup retention window, and a separate /24 subnet
+# at 10.1.0.0/24 to keep dev and prod networks isolated. State is stored in a separate
+# GCS prefix from dev.
+
 # Prod environment — same modules as dev, larger machine type and separate state
 module "network" {
   source      = "../../modules/network"

@@ -1,3 +1,7 @@
+# Module: network
+# Creates a custom VPC and a single regional subnet for all cluster nodes.
+# Auto-mode subnets are disabled so the IP layout is fully under our control.
+
 # Custom VPC — auto_create_subnetworks disabled so we control the subnet layout
 resource "google_compute_network" "main" {
   name                    = "${var.environment}-vpc"

@@ -1,3 +1,8 @@
+# Module: firewall
+# VPC firewall rules for the cluster. SSH and the Kubernetes API are restricted
+# to the operator's CIDR. HTTP/HTTPS is open. Intra-cluster traffic is unrestricted
+# within the subnet so k3s and Flannel CNI can operate freely.
+
 # Allow SSH from operator CIDR only — locked down, not world-open
 resource "google_compute_firewall" "ssh" {
   name    = "${var.environment}-allow-ssh"

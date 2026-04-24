@@ -1,3 +1,8 @@
+# Module: iam
+# Dedicated GCP service account for cluster nodes with minimal permissions.
+# Workload Identity bindings allow the External Secrets Operator and CloudNativePG
+# to authenticate to GCP APIs without storing long-lived credentials in the cluster.
+
 # Dedicated service account for GCE nodes — principle of least privilege
 resource "google_service_account" "nodes" {
   account_id   = "${var.environment}-k8s-nodes"

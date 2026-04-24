@@ -1,3 +1,9 @@
+# Environment: dev
+# Wires all modules together for the development environment. Uses e2-standard-2 nodes,
+# a 30-day backup retention window, and a /24 subnet at 10.0.0.0/24.
+# Secrets for Postgres credentials are seeded into Google Secret Manager here
+# and pulled into the cluster at runtime by the External Secrets Operator.
+
 # VPC and subnet for the cluster
 module "network" {
   source      = "../../modules/network"

@@ -1,3 +1,8 @@
+# Module: node
+# Provisions a single GCE VM with a reserved static internal IP.
+# Called once per node via for_each in the environment. Static IPs are mandatory
+# because k3s embeds node identity at bootstrap time and breaks if IPs change.
+
 # Reserved static internal IP — mandatory for k3s stability; node identity breaks if the IP changes
 resource "google_compute_address" "internal" {
   name         = "${var.name}-internal-ip"

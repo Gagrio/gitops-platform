@@ -1,3 +1,8 @@
+# Module: gcs
+# GCS bucket used by CloudNativePG for WAL archiving and scheduled base backups.
+# force_destroy is enabled so terraform destroy completes cleanly without manual
+# bucket emptying. Lifecycle rules purge objects beyond the retention window.
+
 # GCS bucket for CloudNativePG WAL archiving and base backups
 resource "google_storage_bucket" "backup" {
   name     = "${var.environment}-${var.project_id}-pg-backups"
