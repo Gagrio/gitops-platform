@@ -1,306 +1,285 @@
-# Implementation Plan
+# Deployment Guide
 
-## Overview
-
-Six phases in strict dependency order. Each phase must be complete and tested before the next begins. CI validation gates enforce this on every PR.
-
-```
-Phase 1: Repository skeleton
-    ↓
-Phase 2: Terraform (GCP infrastructure)
-    ↓
-Phase 3: Ansible (node config + k3s + Flux bootstrap)
-    ↓
-Phase 4: GitOps manifests (Flux tree, operators, app)
-    ↓
-Phase 5: CI workflows (GitHub Actions)
-    ↓
-Phase 6: Documentation (README, timetable, leadership answers)
-```
+This guide walks you through deploying the full platform from scratch into your Google Cloud account. By the end you will have a running Kubernetes cluster with a managed PostgreSQL database, GitOps-driven deployments via Flux, automated backups to GCS, and a monitoring stack.
 
 ---
 
-## Phase 1 — Repository Skeleton
+## Prerequisites
 
-Create the full directory structure upfront so all subsequent phases have a home.
+Install the following tools before starting:
 
-**Tasks:**
-
-- [ ] Create directory tree:
-  ```
-  terraform/
-    modules/
-      network/
-      node/
-      firewall/
-      gcs/
-      iam/
-    environments/
-      dev/
-      prod/
-  ansible/
-    roles/
-      base/
-      kubernetes/
-      security/
-      flux/
-    playbooks/
-    inventory/
-  gitops/
-    clusters/
-      dev/
-      prod/
-    infrastructure/
-      controllers/        ← operator installs (CNPG, ESO, Prometheus)
-    operators/
-      postgres/
-    applications/
-      demo-app/
-  .github/
-    workflows/
-  docs/
-  ```
-- [ ] Add `.gitkeep` files to empty leaf directories
-- [ ] Add root `.gitignore` (Terraform state, `.terraform/`, Ansible vault files, kubeconfig)
-
-**Estimated time: 30 min**
-
----
-
-## Phase 2 — Terraform
-
-Provision all GCP infrastructure. Nothing is installed on the nodes at this stage.
-
-### 2.1 Provider and backend config
-
-- [ ] **Prerequisite — create the GCS state bucket manually before `terraform init`:**
-  ```bash
-  gcloud storage buckets create gs://<your-bucket-name> --location=<region>
-  ```
-  The bucket name is intentionally not hardcoded in the Terraform config. It is passed
-  at init time so the code works for any project without modification:
-  ```bash
-  terraform init -backend-config="bucket=<your-bucket-name>"
-  ```
-- [ ] `terraform/environments/dev/versions.tf` — pin `google` provider version, partial GCS backend config (bucket passed at init)
-- [ ] `terraform/environments/dev/variables.tf` — project ID, region, zone, environment name, node count, machine type
-- [ ] `terraform/environments/prod/` — mirror of dev with different variable defaults (can be a stub for now)
-
-### 2.2 Module: network
-
-- [ ] `google_compute_network` — custom VPC (not default)
-- [ ] `google_compute_subnetwork` — subnet with defined CIDR
-- [ ] Outputs: network name, subnetwork name, subnetwork self-link
-
-### 2.3 Module: node
-
-- [ ] `google_compute_address` (INTERNAL) — reserved static internal IP per node (mandatory for k3s stability)
-- [ ] `google_compute_instance` — GCE VM, attached to subnet, uses reserved IP
-  - machine type: `e2-standard-2`
-  - OS: Ubuntu 22.04 LTS
-  - metadata: SSH public key injection
-  - service account attached (from iam module)
-- [ ] Outputs: instance names, internal IPs, external IPs
-
-### 2.4 Module: firewall
-
-- [ ] `google_compute_firewall` — allow rules:
-  - SSH (22) from operator CIDR only
-  - Kubernetes API (6443) from operator CIDR only
-  - HTTP/HTTPS (80/443) from anywhere
-  - Internal cluster traffic (all protocols within subnet CIDR)
-- [ ] Default deny all other ingress
-
-### 2.5 Module: gcs
-
-- [ ] `google_storage_bucket` — backup bucket
-  - `force_destroy = true` (required for clean `terraform destroy`)
-  - versioning enabled
-  - lifecycle rule: delete objects older than retention window
-- [ ] `google_storage_bucket_iam_member` — grant the node service account `objectAdmin` on the bucket
-- [ ] Outputs: bucket name
-
-### 2.6 Module: iam
-
-- [ ] `google_service_account` — dedicated SA for GCE nodes
-- [ ] `google_project_iam_member` — bind minimal roles:
-  - `roles/secretmanager.secretAccessor` (for ESO)
-  - `roles/storage.objectAdmin` scoped to backup bucket
-- [ ] Workload Identity binding — allow k8s ServiceAccount in `postgres` namespace to impersonate this SA
-- [ ] Outputs: service account email
-
-### 2.7 Secret Manager
-
-- [ ] `google_secret_manager_secret` + `google_secret_manager_secret_version` — seed initial Postgres credentials (username, password, replication password)
-
-### 2.8 Wiring
-
-- [ ] `terraform/environments/dev/main.tf` — instantiate all modules with correct dependencies
-- [ ] `terraform/environments/dev/outputs.tf` — expose node IPs and SSH key path (consumed by Ansible inventory)
-
-**Estimated time: 4–6h**
-
----
-
-## Phase 3 — Ansible
-
-Takes nodes from blank OS to running k3s cluster with Flux bootstrapped. Runs as a single playbook.
-
-### 3.1 Inventory
-
-- [ ] `ansible/inventory/hosts.yml` — dynamic inventory template populated from Terraform outputs
-  ```yaml
-  all:
-    children:
-      control:
-        hosts:
-          node-01:
-      workers:
-        hosts:
-          node-02:
-          node-03:
-  ```
-
-### 3.2 Role: base
-
-Applies to all nodes.
-
-- [ ] Install system packages (curl, git, apt-transport-https, etc.)
-- [ ] Set kernel parameters: `br_netfilter`, `ip_forward`, `overlay` module
-- [ ] Install and configure containerd
-- [ ] Disable swap (required by Kubernetes)
-- [ ] Set hostname per node
-
-### 3.3 Role: kubernetes
-
-- [ ] On `control` group: install k3s server
-  - disable default Traefik (we manage ingress via GitOps)
-  - write kubeconfig to local machine
-  - capture k3s node token
-- [ ] On `workers` group: install k3s agent, join cluster using token from control node
-- [ ] Wait for all nodes `Ready` before proceeding
-
-### 3.4 Role: security
-
-- [ ] Configure UFW: allow only SSH, 6443, 80, 443 + intra-cluster
-- [ ] Disable unnecessary services
-- [ ] Set kubelet read-only port to 0
-- [ ] Configure auditd (basic rules)
-
-### 3.5 Role: flux
-
-- [ ] Install `flux` CLI on control node
-- [ ] Run `flux check --pre` to verify prerequisites
-- [ ] Apply Flux install manifests to cluster
-- [ ] Create `GitRepository` CR pointing at this repo
-- [ ] Create root `Kustomization` CR pointing at `gitops/clusters/dev`
-- [ ] Wait for `flux-system` pods `Ready`
-
-### 3.6 Playbook
-
-- [ ] `ansible/playbooks/bootstrap.yml` — orchestrate roles in order:
-  `base` → `kubernetes` → `security` → `flux`
-  with `serial: 1` for the kubernetes role on workers (join one at a time)
-
-**Estimated time: 4–6h**
-
----
-
-## Phase 4 — GitOps Manifests
-
-Everything Flux reconciles after bootstrap. Order within the tree is enforced by Flux `dependsOn` between `Kustomization` CRs.
-
-### 4.1 Flux system config
-
-- [ ] `gitops/clusters/dev/flux-system/` — Flux's own config (generated by bootstrap, committed)
-- [ ] `gitops/clusters/dev/infrastructure.yaml` — `Kustomization` CR pointing at `gitops/infrastructure/`, depends on nothing
-- [ ] `gitops/clusters/dev/operators.yaml` — `Kustomization` CR pointing at `gitops/operators/`, `dependsOn: infrastructure`
-- [ ] `gitops/clusters/dev/applications.yaml` — `Kustomization` CR pointing at `gitops/applications/`, `dependsOn: operators`
-
-### 4.2 Infrastructure controllers
-
-- [ ] **cert-manager** — `HelmRelease` (needed by some operators for webhook certs)
-- [ ] **CloudNativePG operator** — `HelmRelease` from CNPG helm repo
-- [ ] **External Secrets Operator** — `HelmRelease`, configured with `ClusterSecretStore` pointing at Google Secret Manager using Workload Identity
-- [ ] **Prometheus stack** — `HelmRelease` (kube-prometheus-stack), with Grafana enabled
-
-### 4.3 Postgres operator config
-
-- [ ] `gitops/operators/postgres/namespace.yaml` — `postgres` namespace
-- [ ] `gitops/operators/postgres/cluster.yaml` — CloudNativePG `Cluster` CR:
-  - 3 instances (1 primary, 2 replicas)
-  - pd-balanced persistent volumes, 20Gi each
-  - backup configured to GCS bucket
-  - references credentials secret (synced by ESO)
-- [ ] `gitops/operators/postgres/backup.yaml` — `ScheduledBackup` CR (daily)
-- [ ] `gitops/operators/postgres/monitoring.yaml` — `PodMonitor` CR for Prometheus scraping
-- [ ] `gitops/operators/postgres/externalsecret.yaml` — `ExternalSecret` CR pulling Postgres credentials from Secret Manager
-
-### 4.4 Demo application (Adminer)
-
-- [ ] `gitops/applications/demo-app/namespace.yaml`
-- [ ] `gitops/applications/demo-app/deployment.yaml` — Adminer deployment, env vars from secret
-- [ ] `gitops/applications/demo-app/service.yaml`
-- [ ] `gitops/applications/demo-app/ingress.yaml` (optional, or use port-forward for testing)
-- [ ] `gitops/applications/demo-app/externalsecret.yaml` — pulls Postgres connection details
-
-**Estimated time: 5–8h**
-
----
-
-## Phase 5 — CI Workflows
-
-### 5.1 PR validation
-
-- [ ] `.github/workflows/pr-validate.yml`:
-  - `terraform fmt -check` on `terraform/**`
-  - `terraform validate` on `terraform/**`
-  - `terraform plan` on `terraform/**` (requires GCP credentials via Workload Identity Federation)
-  - `ansible-lint` on `ansible/**`
-  - `kubeconform` on `gitops/**`
-
-### 5.2 Deploy workflow
-
-- [ ] `.github/workflows/deploy.yml`:
-  - Triggered on push to `main` when `terraform/**` or `ansible/**` changes
-  - Job 1: `terraform apply`
-  - Job 2: `ansible-playbook bootstrap.yml` (depends on Job 1, reads node IPs from TF outputs)
-  - Flux takes over after Job 2 completes
-
-**Estimated time: 2–3h**
-
----
-
-## Phase 6 — Documentation
-
-- [ ] `README.md` — top-level: what this is, prerequisites, quickstart (terraform apply → ansible-playbook), how to access Adminer and Grafana, how to destroy
-- [ ] `docs/timetable.md` — time per sub-task (fill in actuals as work progresses)
-- [ ] `docs/leadership.md` — written answers to the four leadership questions
-
-**Estimated time: 2–3h**
-
----
-
-## Total Estimate
-
-| Phase | Task | Est. time |
+| Tool | Min version | Install |
 |---|---|---|
-| 1 | Repository skeleton | 0.5h |
-| 2 | Terraform | 4–6h |
-| 3 | Ansible | 4–6h |
-| 4 | GitOps manifests | 5–8h |
-| 5 | CI workflows | 2–3h |
-| 6 | Documentation | 2–3h |
-| | **Total** | **17–26h** |
+| `gcloud` CLI | any recent | https://cloud.google.com/sdk/docs/install |
+| Terraform | >= 1.7 | https://developer.hashicorp.com/terraform/install |
+| Ansible | >= 2.14 | `pip install ansible` |
+| `kubectl` | >= 1.28 | https://kubernetes.io/docs/tasks/tools |
+| `flux` CLI | >= 2.0 | https://fluxcd.io/flux/installation/#install-the-flux-cli |
+
+You also need:
+- A **GCP account** with billing enabled
+- A **GCP project** (existing or new)
+- An **SSH key pair** — if you don't have one: `ssh-keygen -t rsa -b 4096`
+- A **GitHub personal access token** with `repo` scope — Flux uses this to read the repository
 
 ---
 
-## Implementation Order Within a Session
+## Step 1 — GCP Project Setup
 
-When sitting down to implement, work in this order within each phase — never jump ahead to the next phase until the current one is testable:
+### 1.1 Authenticate
 
-1. Scaffold the files (even empty) — structure first
-2. Implement and test Terraform in isolation (`terraform plan` locally)
-3. Implement and test Ansible roles individually before running the full playbook
-4. Build GitOps manifests starting from infrastructure → operators → applications
-5. Wire CI last, once the manual flow works end-to-end
+```bash
+gcloud auth login
+gcloud auth application-default login
+gcloud config set project <your-project-id>
+```
+
+### 1.2 Enable required APIs
+
+```bash
+gcloud services enable \
+  compute.googleapis.com \
+  secretmanager.googleapis.com \
+  storage.googleapis.com \
+  iam.googleapis.com \
+  iamcredentials.googleapis.com
+```
+
+### 1.3 Create the Terraform state bucket
+
+The state bucket must exist before Terraform can initialise. Choose a globally unique name.
+
+```bash
+gcloud storage buckets create gs://<your-bucket-name> \
+  --location=europe-west1 \
+  --uniform-bucket-level-access
+```
+
+---
+
+## Step 2 — Configure Terraform
+
+### 2.1 Set your variables
+
+```bash
+cd terraform/environments/dev
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Open `terraform.tfvars` and fill in your values:
+
+```hcl
+project_id = "your-gcp-project-id"
+region     = "europe-west1"
+zone       = "europe-west1-b"
+admin_cidr = "203.0.113.10/32"   # your current public IP — find it with: curl ifconfig.me
+
+ssh_public_key = "ssh-rsa AAAA..."   # contents of ~/.ssh/id_rsa.pub
+
+pg_superuser_password   = "a-strong-password"
+pg_app_password         = "a-strong-password"
+pg_replication_password = "a-strong-password"
+```
+
+> `admin_cidr` restricts SSH and Kubernetes API access to your IP only. Do not use `0.0.0.0/0`.
+
+### 2.2 Initialise Terraform
+
+```bash
+terraform init -backend-config="bucket=<your-bucket-name>"
+```
+
+### 2.3 Review the plan
+
+```bash
+terraform plan
+```
+
+Review the output. Terraform will create:
+- 1 VPC + 1 subnet
+- 3 GCE instances (`dev-node-01`, `dev-node-02`, `dev-node-03`) each with a reserved static internal IP
+- 1 GCS bucket for PostgreSQL backups
+- 1 GCP service account with scoped IAM permissions
+- 3 secrets in Google Secret Manager (Postgres credentials)
+- VPC firewall rules
+
+### 2.4 Apply
+
+```bash
+terraform apply
+```
+
+This takes approximately 2–3 minutes. When complete, note the outputs:
+
+```bash
+terraform output
+```
+
+You will see the internal and external IPs for all three nodes. You will need these in the next step.
+
+---
+
+## Step 3 — Bootstrap the Cluster
+
+Ansible connects to the three nodes over SSH and:
+1. Configures the OS (packages, kernel parameters, containerd)
+2. Installs k3s and forms the cluster
+3. Hardens the nodes
+4. Installs Flux and connects it to this repository
+
+### 3.1 Configure the inventory
+
+Copy the example inventory and fill in the external IPs from your Terraform output:
+
+```bash
+cd ../../../ansible
+cp inventory/hosts.example.yml inventory/hosts.yml
+```
+
+Edit `inventory/hosts.yml`:
+
+```yaml
+all:
+  children:
+    control:
+      hosts:
+        dev-node-01:
+          ansible_host: <external-ip-of-node-01>
+    workers:
+      hosts:
+        dev-node-02:
+          ansible_host: <external-ip-of-node-02>
+        dev-node-03:
+          ansible_host: <external-ip-of-node-03>
+  vars:
+    ansible_user: ubuntu
+    ansible_ssh_private_key_file: ~/.ssh/id_rsa
+```
+
+### 3.2 Set Flux environment variables
+
+Flux needs your GitHub token and repository details to bootstrap:
+
+```bash
+export GITHUB_TOKEN=<your-github-personal-access-token>
+export GITHUB_USER=<your-github-username>
+```
+
+### 3.3 Run the bootstrap playbook
+
+```bash
+ansible-playbook playbooks/bootstrap.yml -i inventory/hosts.yml
+```
+
+The playbook runs four roles in sequence across all nodes. Expect this to take 5–10 minutes.
+
+When it completes, Flux is running inside the cluster and has already begun reconciling the `gitops/` directory from this repository.
+
+### 3.4 Verify the cluster
+
+The playbook writes a kubeconfig to your local machine at `~/.kube/config-enclaive-dev`. Point kubectl at it:
+
+```bash
+export KUBECONFIG=~/.kube/config-enclaive-dev
+kubectl get nodes
+```
+
+All three nodes should show `Ready`. Then check Flux:
+
+```bash
+flux check
+flux get all -A
+```
+
+---
+
+## Step 4 — Watch GitOps Reconcile
+
+Flux reconciles the repository every 60 seconds. After the bootstrap, it will automatically install:
+
+1. **Infrastructure controllers** — CloudNativePG operator, External Secrets Operator, Prometheus stack
+2. **PostgreSQL cluster** — 3-instance HA cluster with backups and monitoring
+3. **Adminer** — database UI to verify end-to-end connectivity
+
+You can watch the reconciliation live:
+
+```bash
+flux get kustomizations -A --watch
+```
+
+Wait until all kustomizations show `Applied revision` and `True` in the Ready column. This takes approximately 5–10 minutes depending on image pull times.
+
+---
+
+## Step 5 — Verify the Platform
+
+### PostgreSQL cluster
+
+```bash
+kubectl get cluster -n postgres
+kubectl get pods -n postgres
+```
+
+You should see `pg-1`, `pg-2`, `pg-3` all Running. The cluster status should show `Cluster in healthy state`.
+
+### Backups
+
+```bash
+kubectl get scheduledbackup -n postgres
+kubectl get backup -n postgres
+```
+
+### Monitoring
+
+```bash
+kubectl get pods -n monitoring
+```
+
+Access Grafana by port-forwarding:
+
+```bash
+kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring
+```
+
+Open http://localhost:3000 — default credentials are in the Prometheus stack Helm values.
+
+### Adminer
+
+```bash
+kubectl port-forward svc/adminer 8080:80 -n demo-app
+```
+
+Open http://localhost:8080 and connect using:
+- **System**: PostgreSQL
+- **Server**: `postgres-rw.postgres.svc.cluster.local`
+- **Username**: the app username from your tfvars
+- **Password**: the app password from your tfvars
+
+---
+
+## Step 6 — Making Changes
+
+All cluster configuration is managed through Git. To make a change:
+
+1. Edit the relevant file under `gitops/`
+2. Open a pull request
+3. Merge after review
+4. Flux detects the change within 60 seconds and reconciles
+
+Never run `kubectl apply` directly against the cluster.
+
+---
+
+## Step 7 — Teardown
+
+When you are done, destroy all resources cleanly:
+
+```bash
+cd terraform/environments/dev
+terraform destroy
+```
+
+> The GCS backup bucket has `force_destroy = true` set, so Terraform will empty and delete it automatically. The Terraform state bucket is **not** managed by Terraform and must be deleted manually if desired:
+> ```bash
+> gcloud storage rm -r gs://<your-bucket-name>
+> ```
