@@ -1,3 +1,9 @@
+# Before running terraform init, create the GCS state bucket:
+#   gcloud storage buckets create gs://<your-bucket-name> --location=europe-west1
+#
+# Then init with:
+#   terraform init -backend-config="bucket=<your-bucket-name>"
+
 project_id = "your-gcp-project-id"
 region     = "europe-west1"
 zone       = "europe-west1-b"

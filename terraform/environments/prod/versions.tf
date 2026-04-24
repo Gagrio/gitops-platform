@@ -8,8 +8,15 @@ terraform {
     }
   }
 
+  # Partial backend config — bucket name is passed at init time, not hardcoded.
+  # The bucket must be created manually before running terraform init:
+  #
+  #   gcloud storage buckets create gs://<your-bucket-name> --location=<region>
+  #
+  # Then initialise with:
+  #
+  #   terraform init -backend-config="bucket=<your-bucket-name>"
   backend "gcs" {
-    bucket = "REPLACE_WITH_YOUR_PROJECT_ID-tfstate"
     prefix = "environments/prod"
   }
 }

@@ -73,7 +73,16 @@ Provision all GCP infrastructure. Nothing is installed on the nodes at this stag
 
 ### 2.1 Provider and backend config
 
-- [ ] `terraform/environments/dev/versions.tf` — pin `google` provider version, configure GCS backend for remote state
+- [ ] **Prerequisite — create the GCS state bucket manually before `terraform init`:**
+  ```bash
+  gcloud storage buckets create gs://<your-bucket-name> --location=<region>
+  ```
+  The bucket name is intentionally not hardcoded in the Terraform config. It is passed
+  at init time so the code works for any project without modification:
+  ```bash
+  terraform init -backend-config="bucket=<your-bucket-name>"
+  ```
+- [ ] `terraform/environments/dev/versions.tf` — pin `google` provider version, partial GCS backend config (bucket passed at init)
 - [ ] `terraform/environments/dev/variables.tf` — project ID, region, zone, environment name, node count, machine type
 - [ ] `terraform/environments/prod/` — mirror of dev with different variable defaults (can be a stub for now)
 
