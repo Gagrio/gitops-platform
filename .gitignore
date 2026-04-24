@@ -1,0 +1,22 @@
+# Terraform
+**/.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+*.tfvars
+!*.tfvars.example
+.terraform.lock.hcl
+
+# Ansible
+*.retry
+ansible/inventory/hosts.yml
+ansible/.vault_pass
+
+# Kubernetes
+kubeconfig
+*.kubeconfig
+
+# General
+.DS_Store
+*.swp
+*.swo
