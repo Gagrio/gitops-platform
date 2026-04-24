@@ -1,7 +1,9 @@
 # Bootstrap module
-# Uses a local backend — runs once before the GCS state bucket exists.
-# This file is the only Terraform config that runs with personal credentials.
-# After this, CI takes over all further Terraform runs.
+# Runs once with the operator's personal credentials to wire up CI.
+# Uses the same GCS backend as all other environments — the state bucket is
+# created manually (one gcloud command) before this module runs, so it is
+# available here. Storing bootstrap state in GCS is safer than storing it
+# locally and keeps all Terraform state in one place.
 terraform {
   required_version = ">= 1.7"
 
@@ -16,7 +18,11 @@ terraform {
     }
   }
 
-  backend "local" {}
+  # Bucket name passed at init time — same bucket as all other environments
+  #   terraform init -backend-config="bucket=<your-bucket-name>"
+  backend "gcs" {
+    prefix = "bootstrap"
+  }
 }
 
 provider "google" {

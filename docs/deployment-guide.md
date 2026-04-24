@@ -132,7 +132,7 @@ cat ~/.ssh/enclaive-ci.pub
 Then run:
 
 ```bash
-terraform init
+terraform init -backend-config="bucket=<your-bucket-name>"
 terraform apply
 ```
 
@@ -281,7 +281,7 @@ Type `yes` when prompted. The GCS backup bucket is deleted automatically (`force
 gcloud storage rm -r gs://${PROJECT_ID}-tfstate
 ```
 
-The bootstrap state (local file in `terraform/bootstrap/`) can be deleted safely once the infrastructure is destroyed — it is gitignored and contains no sensitive values.
+The bootstrap state lives in the same GCS bucket under the `bootstrap` prefix and will be cleaned up when the bucket is deleted.
 
 ---
 
