@@ -66,22 +66,40 @@ cd terraform/environments/dev
 cp terraform.tfvars.example terraform.tfvars
 ```
 
-Open `terraform.tfvars` and fill in your values:
+Open `terraform.tfvars` and fill in your values. Here is where each one comes from:
 
-```hcl
-project_id = "your-gcp-project-id"
-region     = "europe-west1"
-zone       = "europe-west1-b"
-admin_cidr = "203.0.113.10/32"   # your current public IP — find it with: curl ifconfig.me
-
-ssh_public_key = "ssh-rsa AAAA..."   # contents of ~/.ssh/id_rsa.pub
-
-pg_superuser_password   = "a-strong-password"
-pg_app_password         = "a-strong-password"
-pg_replication_password = "a-strong-password"
+**`project_id`** — Your GCP project ID. Find it in the GCP Console under the project selector, or run:
+```bash
+gcloud projects list
 ```
 
-> `admin_cidr` restricts SSH and Kubernetes API access to your IP only. Do not use `0.0.0.0/0`.
+**`region` and `zone`** — The GCP region and zone to deploy into. Defaults to `europe-west1` / `europe-west1-b`. See the full list at https://cloud.google.com/compute/docs/regions-zones. Pick a region geographically close to you.
+
+**`admin_cidr`** — Your current public IP address in CIDR notation. This restricts SSH and Kubernetes API access to your machine only. Find your IP with:
+```bash
+curl ifconfig.me
+# append /32 to make it a host CIDR, e.g. 203.0.113.10/32
+```
+
+**`ssh_public_key`** — The public key Terraform injects into the nodes so Ansible can SSH in. Use your existing key or generate one:
+```bash
+# Generate a new key (skip if you already have one)
+ssh-keygen -t rsa -b 4096 -f ~/.ssh/id_rsa
+
+# Print the public key to copy into tfvars
+cat ~/.ssh/id_rsa.pub
+```
+
+**`pg_superuser_password`** — Password for the PostgreSQL superuser (`postgres`). Used for admin operations. Use a strong random value:
+```bash
+openssl rand -base64 24
+```
+
+**`pg_app_password`** — Password for the application user that Adminer and your workloads connect with. Generate the same way.
+
+**`pg_replication_password`** — Password for the replication user CloudNativePG uses for streaming replication between primary and replicas. Generate the same way.
+
+> These passwords are stored in Google Secret Manager by Terraform and never written to disk or committed to Git. The `terraform.tfvars` file itself is gitignored.
 
 ### 2.2 Initialise Terraform
 
