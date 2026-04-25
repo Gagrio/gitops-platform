@@ -1,15 +1,15 @@
 ---
-# Flux Kustomization — reconciles all cluster-wide controllers (ingress, monitoring, ESO).
-# Points at the same shared base as dev; environment-specific values come from
-# cluster-global and cluster-vars ConfigMaps created by the Ansible bootstrap.
+# Flux Kustomization — reconciles shared cluster platform components (ingress, monitoring, ESO).
+# Manifests live in clusters/common/ and are shared across all environments;
+# environment-specific values are injected via cluster-global and cluster-vars ConfigMaps.
 apiVersion: kustomize.toolkit.fluxcd.io/v1
 kind: Kustomization
 metadata:
-  name: infrastructure
+  name: common
   namespace: flux-system
 spec:
   interval: 10m
-  path: ./gitops/infrastructure/controllers
+  path: ./gitops/clusters/common
   prune: true
   sourceRef:
     kind: GitRepository

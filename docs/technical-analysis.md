@@ -91,15 +91,15 @@ The challenge lists ArgoCD as the preferred option. We chose Flux because it int
 
 The `gitops/` directory is the root of everything Flux manages. It's structured by environment (`clusters/dev`, `clusters/prod`) and by concern:
 
-- 🛠️ `infrastructure/` — cluster-wide tooling: ingress-nginx, External Secrets Operator, kube-prometheus-stack
+- 🛠️ `clusters/common/` — shared cluster platform components: ingress-nginx, External Secrets Operator, kube-prometheus-stack
 - 🐘 `operators/postgres/` — the CloudNativePG `Cluster` CR and related backup/monitoring configuration
 - 🖥️ `applications/demo-app/` — the Adminer deployment, service, and ingress
 
-Flux processes these in dependency order: infrastructure must be healthy before operators are applied, operators before applications.
+Flux processes these in dependency order: common must be healthy before operators are applied, operators before applications.
 
 ### 🌍 Per-environment configuration
 
-The manifests in `infrastructure/`, `operators/`, and `applications/` are **shared** — both dev and prod point at the same files, no duplication. Environment-specific values flow through two ConfigMaps created by Ansible during bootstrap:
+The manifests in `clusters/common/`, `operators/`, and `applications/` are **shared** — both dev and prod point at the same files, no duplication. Environment-specific values flow through two ConfigMaps created by Ansible during bootstrap:
 
 - `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this single-project setup)
 - `cluster-vars` — `ENVIRONMENT` and `REGION` (per-environment; REGION can differ if dev and prod run in different GCP regions)
@@ -173,7 +173,7 @@ CloudNativePG exposes PostgreSQL metrics natively via a `PodMonitor` CR that tel
       │  roles/kubernetes  → k3s install, cluster join
       │  roles/flux        → Flux install, GitRepository CR, Kustomization CR
       ▼
-  Flux reconciles infrastructure/
+  Flux reconciles clusters/common/
       │  installs: ingress-nginx, External Secrets Operator, Prometheus stack
       ▼
   Flux reconciles operators/postgres/
@@ -221,7 +221,7 @@ Two jobs run sequentially on push to `main`. Flux handles everything after that 
   CI is done. Flux takes over. 🔄
       │
       └── Flux reconciles gitops/ continuously (60s loop)
-              infrastructure/ → operators/postgres/ → applications/demo-app/
+              clusters/common/ → operators/postgres/ → applications/demo-app/
 ```
 
 ### ❌ What CI does NOT do

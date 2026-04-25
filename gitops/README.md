@@ -10,12 +10,14 @@ No one runs `kubectl apply` to deploy things. You open a PR, get it reviewed, me
 gitops/
   clusters/
     dev/                          ← Flux entry point for the dev cluster
-      infrastructure.yaml         ← Flux Kustomization → infrastructure/controllers
+      common.yaml                 ← Flux Kustomization → clusters/common
       postgres.yaml               ← Flux Kustomization → operators/postgres
       demo-app.yaml               ← Flux Kustomization → applications/demo-app
     prod/                         ← same structure, same shared manifests, different cluster-vars
-  infrastructure/
-    controllers/                  ← cluster-wide tooling (ingress, monitoring, ESO)
+      common.yaml
+      postgres.yaml
+      demo-app.yaml
+    common/                       ← shared cluster platform components (ingress, monitoring, ESO)
   operators/
     postgres/                     ← CloudNativePG operator + HA cluster + secrets
   applications/
@@ -29,14 +31,14 @@ When Flux bootstraps (done by Ansible during the first CI run), it creates a `Gi
 ```
 Flux watches gitops/clusters/dev/
     │
-    ├── infrastructure.yaml  →  reconciles gitops/infrastructure/controllers/
+    ├── common.yaml    →  reconciles gitops/clusters/common/
     │       installs: ingress-nginx, External Secrets Operator, kube-prometheus-stack
     │       (must be healthy before the next layer starts ✅)
     │
     ├── postgres.yaml  →  reconciles gitops/operators/postgres/
     │       installs: CloudNativePG operator
     │       creates:  3-instance HA PostgreSQL cluster, ExternalSecrets for credentials
-    │       (depends on infrastructure — ESO must be ready to pull secrets 🔐)
+    │       (depends on common — ESO must be ready to pull secrets 🔐)
     │
     └── demo-app.yaml  →  reconciles gitops/applications/demo-app/
             deploys:  Adminer (database UI), service, ingress
@@ -47,7 +49,7 @@ The `dependsOn` field in each Flux Kustomization enforces this order. Flux will 
 
 ## 🌍 Shared manifests, per-environment config
 
-The manifests in `infrastructure/`, `operators/`, and `applications/` are **shared** — both `clusters/dev` and `clusters/prod` point at exactly the same files. No duplication. Environment-specific values are injected at reconcile time via Flux post-build variable substitution.
+The manifests in `clusters/common/`, `operators/`, and `applications/` are **shared** — both `clusters/dev` and `clusters/prod` point at exactly the same files. No duplication. Environment-specific values are injected at reconcile time via Flux post-build variable substitution.
 
 Two ConfigMaps in the `flux-system` namespace supply these variables (created by the Ansible `flux` role during bootstrap):
 
@@ -65,7 +67,7 @@ Every Flux Kustomization references both via `postBuild.substituteFrom`. Manifes
 
 No manifest duplication, no divergence.
 
-## 🛠️ Infrastructure layer (`infrastructure/controllers/`)
+## 🛠️ Common layer (`clusters/common/`)
 
 Cluster-wide tooling managed as HelmReleases:
 
