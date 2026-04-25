@@ -88,6 +88,8 @@ enclaive-platform-challenge/
 
 ## ⚡ Quick Start
 
+> 📋 **Prerequisites:** `gcloud`, `terraform`, `gh`, and `kubectl` must be installed. See the [Prerequisites section](Documentation/deployment-guide.md#-prerequisites) of the Deployment Guide.
+
 Two manual steps, then everything is automated:
 
 ```bash
