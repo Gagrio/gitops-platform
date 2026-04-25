@@ -19,6 +19,11 @@ jobs:
   terraform-validate:
     name: Terraform Validate & Plan
     runs-on: ubuntu-latest
+    env:
+      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ secrets.GCP_REGION }}
+      TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
+      TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -51,15 +56,7 @@ jobs:
 
       - name: Terraform plan
         working-directory: terraform/environments/dev
-        run: |
-          terraform plan \
-            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
-            -var="region=${{ secrets.GCP_REGION }}" \
-            -var="admin_cidr=${{ secrets.ADMIN_CIDR }}" \
-            -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}" \
-            -no-color
-        env:
-          TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+        run: terraform plan -no-color
 
   ansible-lint:
     name: Ansible Lint

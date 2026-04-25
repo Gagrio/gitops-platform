@@ -21,6 +21,11 @@ jobs:
     name: Terraform Apply
     runs-on: ubuntu-latest
     environment: dev
+    env:
+      TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
+      TF_VAR_region: ${{ secrets.GCP_REGION }}
+      TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
+      TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
     outputs:
       node_external_ips: ${{ steps.tf-output.outputs.node_external_ips }}
       gcp_project_id: ${{ steps.tf-output.outputs.gcp_project_id }}
@@ -49,12 +54,7 @@ jobs:
 
       - name: Terraform apply
         working-directory: terraform/environments/dev
-        run: |
-          terraform apply -auto-approve \
-            -var="project_id=${{ secrets.GCP_PROJECT_ID }}" \
-            -var="region=${{ secrets.GCP_REGION }}" \
-            -var="admin_cidr=${{ secrets.ADMIN_CIDR }}" \
-            -var="ssh_public_key=${{ secrets.SSH_PUBLIC_KEY }}"
+        run: terraform apply -auto-approve
 
       - name: Generate Ansible inventory from Terraform output
         id: tf-output
