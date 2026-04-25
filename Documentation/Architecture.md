@@ -6,10 +6,10 @@
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                            GIT REPOSITORY (GitHub)                              │
 │                                                                                 │
-│   terraform/           ansible/           gitops/            docs/              │
-│   ├── modules/         ├── roles/         ├── clusters/       ├── architecture  │
-│   │   ├── network      │   ├── base       │   ├── dev/        └── runbooks/     │
-│   │   ├── node         │   ├── k8s        │   └── prod/                         │
+│   terraform/           ansible/           gitops/            Documentation/     │
+│   ├── modules/         ├── roles/         ├── clusters/       ├── Architecture   │
+│   │   ├── network      │   ├── base       │   ├── dev/        ├── Operations     │
+│   │   ├── node         │   ├── k8s        │   └── prod/       └── Security       │
 │   │   └── firewall     │   └── security   ├── operators/                        │
 │   └── environments/    └── playbooks/     │   └── postgres/                     │
 │       ├── dev/             bootstrap.yml  └── applications/                     │

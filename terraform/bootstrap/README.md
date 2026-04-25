@@ -18,7 +18,7 @@ This module runs **once**, manually, before CI exists. It creates the GCP identi
 
 Before running this module:
 
-1. The GCS state bucket must already exist (one `gcloud` command — see the [Deployment Guide](../../docs/deployment-guide.md))
+1. The GCS state bucket must already exist (one `gcloud` command — see the [Deployment Guide](../../Documentation/deployment-guide.md))
 2. You must be authenticated with personal GCP credentials (`gcloud auth application-default login`)
 3. You must have a GitHub personal access token with `repo` scope
 
@@ -32,7 +32,7 @@ terraform init -backend-config="bucket=<your-state-bucket-name>"
 terraform apply
 ```
 
-After `terraform apply` completes, add the SSH private key to GitHub secrets manually — see Step 1.6 of the [Deployment Guide](../../docs/deployment-guide.md).
+After `terraform apply` completes, add the SSH private key to GitHub secrets manually — see Step 1.6 of the [Deployment Guide](../../Documentation/deployment-guide.md).
 
 ## 🗄️ Backend
 

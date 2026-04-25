@@ -75,11 +75,13 @@ enclaive-platform-challenge/
 ├── scripts/
 │   └── bootstrap.sh            # Automates the one-time setup — run once, CI takes over
 │
-└── docs/
-    ├── architecture.md         # Platform diagram, CI design, GitOps flow, storage, backups
-    ├── deployment-guide.md     # Step-by-step: bootstrap → deploy → verify → day-2
-    ├── technical-analysis.md   # Deep dive: every component and every design decision
-    └── leadership.md           # Team organisation, multi-env strategy, reliability, security
+└── Documentation/
+    ├── Architecture.md                # Platform diagram, CI design, GitOps flow, storage, backups
+    ├── Operational lifecycle.md       # Backup, restore, upgrades, monitoring, scaling
+    ├── Security considerations.md     # Secret management, access control, network policies
+    ├── deployment-guide.md            # Step-by-step: bootstrap → deploy → verify → day-2
+    ├── technical-analysis.md          # Deep dive: every component and every design decision
+    └── leadership.md                  # Team organisation, multi-env strategy, reliability, security
 ```
 
 ---
@@ -102,7 +104,7 @@ bash scripts/bootstrap.sh
 
 The script handles everything else: GCS state bucket, SSH key pair, `terraform apply` on the bootstrap module, and all GitHub Actions secrets. After it completes, merge any change to `main` touching `terraform/` or `ansible/` and CI deploys the full stack automatically.
 
-📖 Full instructions: [docs/deployment-guide.md](docs/deployment-guide.md)
+📖 Full instructions: [Documentation/deployment-guide.md](Documentation/deployment-guide.md)
 
 ---
 
@@ -110,12 +112,12 @@ The script handles everything else: GCS state bucket, SSH key pair, `terraform a
 
 | Document | What it covers |
 |---|---|
-| [Architecture](docs/architecture.md) | Platform diagram, CI pipeline design, GitOps flow, firewall design, storage |
-| [Operational Lifecycle](docs/operations.md) | Backup, restore, upgrades, monitoring, scaling |
-| [Security Considerations](docs/security.md) | Secret management, access control, network policies |
-| [Deployment Guide](docs/deployment-guide.md) | Bootstrap, deploy, verify, day-2 operations, teardown, troubleshooting |
-| [Technical Analysis](docs/technical-analysis.md) | Design rationale for every component and every decision made |
-| [Leadership Answers](docs/leadership.md) | Team organisation, multi-environment strategy, reliability, security |
+| [Architecture](Documentation/Architecture.md) | Platform diagram, CI pipeline design, GitOps flow, firewall design, storage |
+| [Operational Lifecycle](Documentation/Operational%20lifecycle.md) | Backup, restore, upgrades, monitoring, scaling |
+| [Security Considerations](Documentation/Security%20considerations.md) | Secret management, access control, network policies |
+| [Deployment Guide](Documentation/deployment-guide.md) | Bootstrap, deploy, verify, day-2 operations, teardown, troubleshooting |
+| [Technical Analysis](Documentation/technical-analysis.md) | Design rationale for every component and every decision made |
+| [Leadership Answers](Documentation/leadership.md) | Team organisation, multi-environment strategy, reliability, security |
 
 ---
 
