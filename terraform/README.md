@@ -39,7 +39,7 @@ Before CI can run Terraform, something has to create the CI identity itself — 
 - 🔐 Sets up Workload Identity Federation so GitHub Actions authenticates to GCP without storing any credentials
 - 🔒 Populates all non-sensitive GitHub Actions secrets automatically
 
-After bootstrap you never touch this module again. See the [Deployment Guide](../Documentation/Deployment guide.md) for the full walkthrough.
+After bootstrap you never touch this module again. See the [Deployment Guide](../Documentation/Deployment%20guide.md) for the full walkthrough.
 
 ## 🧠 Key design decisions
 
@@ -67,4 +67,4 @@ Both environments live in the same GCP project and use the same Terraform state 
 
 CI runs Terraform automatically on every merge to `main` that touches `terraform/`. You never run `terraform apply` manually after the initial bootstrap. On pull requests, CI runs `terraform plan` so you can review the impact before merging.
 
-For the full picture of how Terraform fits into the CI pipeline, see the [Technical Analysis](../Documentation/Technical analysis.md).
+For the full picture of how Terraform fits into the CI pipeline, see the [Technical Analysis](../Documentation/Technical%20analysis.md).

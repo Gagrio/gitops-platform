@@ -108,4 +108,4 @@ No CI job runs for GitOps changes. Flux polls the repository every 60 seconds an
 edit file → push branch → open PR (CI runs terraform plan) → merge → CI applies
 ```
 
-For the full picture of how this fits into the CI pipeline, see the [Technical Analysis](../Documentation/Technical analysis.md).
+For the full picture of how this fits into the CI pipeline, see the [Technical Analysis](../Documentation/Technical%20analysis.md).
