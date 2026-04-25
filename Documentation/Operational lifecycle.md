@@ -99,9 +99,39 @@ Bump the `imageName` in the `Cluster` CR and merge. CloudNativePG performs a **r
 
 ### ☸️ k3s Upgrade
 
-Bump `k3s_version` in `ansible/inventory/group_vars/all.yml` and merge. CI runs the bootstrap playbook, which re-runs the k3s installer. The installer detects the version mismatch and upgrades in place.
+Bump `k3s_version` in `ansible/inventory/group_vars/all.yml` and merge. CI runs the bootstrap playbook, which re-runs the k3s installer on all nodes. The installer detects the version mismatch and upgrades in place.
 
-For a zero-downtime upgrade on a production cluster, upgrade worker nodes one at a time: drain the node (`kubectl drain`), upgrade, verify it rejoins, then move to the next worker. Upgrade the control plane last.
+> ⚠️ **Limitation:** The bootstrap playbook upgrades all nodes without draining workloads first. Pods running on a node being upgraded may be interrupted. This is acceptable for dev but not for production workloads that require zero downtime.
+
+The GitOps-native solution for zero-downtime k3s upgrades is the **k3s System Upgrade Controller**:
+
+```
+  1. Deploy the System Upgrade Controller to the cluster (via Flux)
+  2. Create a Plan CR in Git pointing at the target k3s version:
+
+         apiVersion: upgrade.cattle.io/v1
+         kind: Plan
+         metadata:
+           name: k3s-server
+           namespace: system-upgrade
+         spec:
+           concurrency: 1          # one node at a time
+           version: v1.32.0+k3s1
+           nodeSelector:
+             matchLabels:
+               node-role.kubernetes.io/control-plane: "true"
+           drain:
+             force: true
+           upgrade:
+             image: rancher/k3s-upgrade
+
+  3. Flux reconciles the Plan CR
+  4. The controller drains each node, upgrades k3s, verifies it rejoins,
+     then moves to the next — workers first, control plane last
+  5. Zero downtime throughout
+```
+
+This approach keeps the upgrade fully declarative and GitOps-driven without modifying the bootstrap playbook.
 
 ### 🔄 Flux Upgrade
 
