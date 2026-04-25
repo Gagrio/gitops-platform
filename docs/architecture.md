@@ -63,7 +63,7 @@
 │   │                                  │   │                               │      │
 │   │   CloudNativePG Operator         │   │   Adminer (Deployment)        │      │
 │   │                                  │   │   ├── 1 replica               │      │
-│   │   Cluster CR                     │   │   ├── envFrom: secret         │      │
+│   │   Cluster CR                     │   │   ├── env: DEFAULT_SERVER     │      │
 │   │   ├── pg-1  (primary)  ──────────────────► connects to Postgres      │      │
 │   │   ├── pg-2  (replica)            │   │   └── Ingress / Service       │      │
 │   │   └── pg-3  (replica)            │   └───────────────────────────────┘      │
@@ -73,7 +73,7 @@
 │   │                                  │   │                               │      │
 │   │   PodMonitor CR                  │   │   Prometheus                  │      │
 │   │   └──► Prometheus scrape         │   │   Grafana                     │      │
-│   │                                  │   │   Alertmanager                │      │
+│   │                                  │   │   (Alertmanager disabled)     │      │
 │   │   Secrets via External Secrets   │   └───────────────────────────────┘      │
 │   │   └──► Google Secret Manager     │                                          │
 │   └──────────────────────────────────┘                                          │

@@ -58,7 +58,7 @@ On **workers**: runs the k3s installer in agent mode using the token and control
 Downloads the Flux CLI binary, waits for the cluster API to be reachable, and runs `flux bootstrap github` if Flux isn't already installed. After bootstrapping, it creates two ConfigMaps in the `flux-system` namespace that Flux uses for post-build variable substitution in all Kustomizations:
 
 - `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this project)
-- `cluster-vars` — `ENVIRONMENT` and `REGION` (per-environment; REGION can differ if dev and prod need to run in different GCP regions)
+- `cluster-vars` — `ENVIRONMENT`, `REGION`, and `STORAGE_CLASS` (per-environment; STORAGE_CLASS differs between dev and prod for storage durability)
 
 Finally, it copies the kubeconfig to `/tmp/kubeconfig-enclaive-dev` so the CI job can upload it as an artifact.
 
@@ -87,7 +87,7 @@ CI runs the bootstrap playbook automatically as the second job in the deploy pip
 
 ```bash
 ansible-playbook playbooks/bootstrap.yml \
-  --extra-vars "gcp_project_id=... region=... environment=dev github_token=..."
+  --extra-vars "gcp_project_id=... region=... environment=dev subnet_cidr=... storage_class=local-path github_token=..."
 ```
 
 For the full CI pipeline picture, see the [Technical Analysis](../docs/technical-analysis.md).

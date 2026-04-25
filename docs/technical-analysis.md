@@ -102,7 +102,7 @@ Flux processes these in dependency order: common must be healthy before operator
 The manifests in `clusters/common/`, `operators/`, and `applications/` are **shared** — both dev and prod point at the same files, no duplication. Environment-specific values flow through two ConfigMaps created by Ansible during bootstrap:
 
 - `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this single-project setup)
-- `cluster-vars` — `ENVIRONMENT` and `REGION` (per-environment; REGION can differ if dev and prod run in different GCP regions)
+- `cluster-vars` — `ENVIRONMENT`, `REGION`, and `STORAGE_CLASS` (per-environment; REGION can differ if dev and prod run in different GCP regions; STORAGE_CLASS differs for storage durability — see Architecture doc)
 
 ---
 
@@ -195,15 +195,21 @@ Each layer depends on the one above it. Rebuild from scratch? Work top to bottom
 
 ## 🚦 CI Pipeline
 
-Two jobs run sequentially on push to `main`. Flux handles everything after that autonomously.
+Three workflows cover the full repository. Flux handles everything after the deploy workflow autonomously.
 
 ```
   PR opened
       │
-      ├── terraform fmt + validate + plan   (no apply)
-      ├── ansible-lint
-      └── kubeconform (validate gitops/ manifests)
-
+      ├── repo-checks.yml (all PRs, no path filter)
+      │     ├── secret scanning (gitleaks)
+      │     ├── YAML lint
+      │     └── markdown lint
+      │
+      ├── validate.yml (terraform/**, ansible/**, gitops/**)
+      │     ├── terraform fmt + validate + plan   (no apply)
+      │     ├── ansible-lint
+      │     └── kubeconform (validate gitops/ manifests)
+      │
       All must pass before merge is allowed ✅
 
   Merge to main
@@ -233,13 +239,16 @@ Two jobs run sequentially on push to `main`. Flux handles everything after that 
 
 ### ✅ PR validation gates
 
-| Check | Tool | Blocks merge |
-|---|---|---|
-| Terraform formatting | `terraform fmt -check` | Yes |
-| Terraform validity | `terraform validate` | Yes |
-| Terraform plan | `terraform plan` | Yes (on error) |
-| Ansible lint | `ansible-lint` | Yes |
-| Manifest validation | `kubeconform` | Yes |
+| Check | Tool | Runs on | Blocks merge |
+|---|---|---|---|
+| Secret scanning | `gitleaks` | All PRs | Yes |
+| YAML lint | `yamllint` | All PRs | Yes |
+| Markdown lint | `markdownlint` | All PRs | Yes |
+| Terraform formatting | `terraform fmt -check` | `terraform/**` | Yes |
+| Terraform validity | `terraform validate` | `terraform/**` | Yes |
+| Terraform plan | `terraform plan` | `terraform/**` | Yes (on error) |
+| Ansible lint | `ansible-lint` | `ansible/**` | Yes |
+| Manifest validation | `kubeconform` | `gitops/**` | Yes |
 
 ---
 

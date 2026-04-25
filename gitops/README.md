@@ -56,7 +56,7 @@ Two ConfigMaps in the `flux-system` namespace supply these variables (created by
 | ConfigMap | Keys | Scope |
 |---|---|---|
 | `cluster-global` | `GCP_PROJECT_ID` | Same for all environments (single GCP project) |
-| `cluster-vars` | `ENVIRONMENT`, `REGION` | Per-environment; REGION can differ if dev and prod run in different GCP regions |
+| `cluster-vars` | `ENVIRONMENT`, `REGION`, `STORAGE_CLASS` | Per-environment; REGION can differ if dev and prod run in different GCP regions; STORAGE_CLASS differs for storage durability |
 
 Every Flux Kustomization references both via `postBuild.substituteFrom`. Manifests use `${VARIABLE}` syntax wherever an environment-specific value is needed (e.g. `gs://${ENVIRONMENT}-${GCP_PROJECT_ID}-pg-backups`).
 
@@ -86,6 +86,7 @@ Three resources work together:
 - 📦 **`cloudnativepg.yaml`** — installs the CloudNativePG operator via HelmRelease
 - 🔐 **`external-secrets.yaml`** — three `ExternalSecret` resources that pull the superuser, app user, and replication passwords from GCP Secret Manager and create Kubernetes Secrets
 - 🗄️ **`cluster.yaml`** — the `Cluster` CR that tells the operator to create a 3-instance HA PostgreSQL 16 cluster with GCS backups, `PodMonitor` for metrics, and topology spread constraints so each instance lands on a different node
+- ⏰ **`scheduled-backup.yaml`** — a `ScheduledBackup` CR that triggers a full base backup daily at 02:00 UTC; combined with continuous WAL archiving this enables point-in-time recovery
 
 Credentials never touch Git. They live in Secret Manager (written there by Terraform's `random_password` resource) and are pulled into the cluster by ESO.
 
