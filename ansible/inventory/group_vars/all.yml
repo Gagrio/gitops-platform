@@ -2,7 +2,7 @@
 # Environment-specific values (k3s_version, flux_version, etc.) are set here
 # and overridden per-environment via extra-vars in CI if needed.
 
-ansible_user: ansible
+ansible_user: ubuntu
 ansible_ssh_private_key_file: ~/.ssh/enclaive-ci
 
 # k3s
