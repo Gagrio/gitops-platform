@@ -19,6 +19,17 @@
     regexp: '^([^#].*\s+swap\s+.*)$'
     replace: '# \1'
 
+- name: Load br_netfilter module
+  community.general.modprobe:
+    name: br_netfilter
+    state: present
+
+- name: Persist br_netfilter across reboots
+  ansible.builtin.copy:
+    dest: /etc/modules-load.d/k8s.conf
+    content: "br_netfilter\n"
+    mode: "0644"
+
 - name: Set kernel parameters for Kubernetes networking
   ansible.posix.sysctl:
     name: "{{ item.key }}"
@@ -32,17 +43,6 @@
     - { key: "net.bridge.bridge-nf-call-ip6tables", value: "1" }
     - { key: "fs.inotify.max_user_watches", value: "524288" }
     - { key: "fs.inotify.max_user_instances", value: "512" }
-
-- name: Load br_netfilter module
-  community.general.modprobe:
-    name: br_netfilter
-    state: present
-
-- name: Persist br_netfilter across reboots
-  ansible.builtin.copy:
-    dest: /etc/modules-load.d/k8s.conf
-    content: "br_netfilter\n"
-    mode: "0644"
 
 - name: Set timezone to UTC
   community.general.timezone:
