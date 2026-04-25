@@ -3,6 +3,9 @@ security_packages:
   - ufw
   - fail2ban
 
+# Override per environment via --extra-vars in CI
+subnet_cidr: "10.0.0.0/24"
+
 # UFW — only the ports k3s and ingress actually need
 ufw_rules:
   - { rule: allow, port: 22, proto: tcp, comment: SSH }

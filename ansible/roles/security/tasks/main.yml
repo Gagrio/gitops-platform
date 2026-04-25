@@ -51,7 +51,7 @@
 - name: Allow all traffic within the cluster subnet
   community.general.ufw:
     rule: allow
-    src: "10.0.0.0/24"
+    src: "{{ subnet_cidr }}"
 
 - name: Enable UFW with default deny incoming
   community.general.ufw:
