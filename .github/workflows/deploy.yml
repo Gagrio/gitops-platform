@@ -1,18 +1,17 @@
 ---
-# Triggered manually — always choose the target environment explicitly.
+# Triggered by push to main (→ dev) or prod (→ prod).
+# The target environment is derived from the branch name — no manual selection needed.
 # Application changes go through Flux — no CI job needed for those.
 name: Deploy
 
 on:
-  workflow_dispatch:
-    inputs:
-      environment:
-        description: "Target environment"
-        required: true
-        type: choice
-        options:
-          - dev
-          - prod
+  push:
+    branches:
+      - main   # deploys to dev
+      - prod   # deploys to prod
+    paths:
+      - "terraform/**"
+      - "ansible/**"
 
 permissions:
   contents: read
@@ -22,9 +21,9 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    environment: \${{ inputs.environment }}
+    environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
-      ENVIRONMENT: \${{ inputs.environment }}
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_region: ${{ secrets.GCP_REGION }}
       TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
@@ -60,9 +59,9 @@ jobs:
     name: Ansible Bootstrap
     runs-on: ubuntu-latest
     needs: terraform-apply
-    environment: \${{ inputs.environment }}
+    environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
-      ENVIRONMENT: \${{ inputs.environment }}
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
       GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}    # read by gcp_compute inventory plugin
     steps:
       - name: Checkout
@@ -102,7 +101,13 @@ jobs:
           STORAGE_CLASS: ${{ env.ENVIRONMENT == 'prod' && 'standard' || 'local-path' }}
         run: |
           ansible-playbook playbooks/bootstrap.yml \
-            --extra-vars "gcp_project_id=${{ secrets.GCP_PROJECT_ID }} region=${{ secrets.GCP_REGION }} environment=${{ env.ENVIRONMENT }} subnet_cidr=${{ secrets.SUBNET_CIDR }} storage_class=${{ env.STORAGE_CLASS }} github_token=${{ secrets.GITHUB_TOKEN }}"
+            --extra-vars "gcp_project_id=${{ secrets.GCP_PROJECT_ID }} \
+                          region=${{ secrets.GCP_REGION }} \
+                          environment=${{ env.ENVIRONMENT }} \
+                          gitops_branch=${{ github.ref_name }} \
+                          subnet_cidr=${{ secrets.SUBNET_CIDR }} \
+                          storage_class=${{ env.STORAGE_CLASS }} \
+                          github_token=${{ secrets.GITHUB_TOKEN }}"
 
       - name: Upload kubeconfig artifact
         uses: actions/upload-artifact@v4
@@ -115,9 +120,9 @@ jobs:
     name: Smoke Test
     runs-on: ubuntu-latest
     needs: ansible-bootstrap
-    environment: \${{ inputs.environment }}
+    environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
-      ENVIRONMENT: \${{ inputs.environment }}
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
     steps:
       - name: Authenticate to GCP via Workload Identity Federation
         uses: google-github-actions/auth@v2
