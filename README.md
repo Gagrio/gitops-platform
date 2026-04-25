@@ -61,9 +61,9 @@ enclaive-platform-challenge/
 │
 ├── gitops/
 │   ├── clusters/
-│   │   ├── common/             # Shared platform: ingress-nginx, ESO, Prometheus stack
 │   │   ├── dev/                # Dev entry point — Flux root for the dev cluster
 │   │   └── prod/               # Prod entry point — same manifests, different vars
+│   │   ├── common/             # Shared platform: ingress-nginx, ESO, Prometheus stack
 │   ├── operators/postgres/     # CloudNativePG Cluster CR, ScheduledBackup, ExternalSecrets
 │   └── applications/demo-app/  # Adminer Deployment, Service, Ingress
 │
