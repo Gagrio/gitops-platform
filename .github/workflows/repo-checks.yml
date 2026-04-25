@@ -1,0 +1,38 @@
+---
+# Runs on every PR regardless of which files changed.
+# These checks apply to the whole repository — they catch issues in paths
+# that the path-filtered validate.yml and deploy.yml workflows do not watch
+# (e.g. docs/, README.md, or any new top-level directory added in the future).
+name: Repo Checks
+
+on:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  repo-checks:
+    name: Repo-wide Checks
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0    # gitleaks scans commit history, not just the working tree
+
+      - name: Secret scanning (gitleaks)
+        run: |
+          curl -sSfL https://github.com/gitleaks/gitleaks/releases/download/v8.18.4/gitleaks_8.18.4_linux_x64.tar.gz \
+            | tar xz -C /usr/local/bin
+          gitleaks detect --source . --log-level warn
+
+      - name: YAML lint
+        run: |
+          pip install yamllint
+          yamllint .
+
+      - name: Markdown lint
+        run: |
+          npm install -g markdownlint-cli
+          markdownlint '**/*.md' --ignore node_modules

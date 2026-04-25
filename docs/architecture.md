@@ -87,6 +87,27 @@
 
 ---
 
+## 🔁 CI Pipeline Design
+
+Three GitHub Actions workflows cover the full repository:
+
+| Workflow | Trigger | Path filter | Purpose |
+|----------|---------|-------------|---------|
+| `repo-checks.yml` | Every PR | None — catches everything | Secret scanning, YAML lint, Markdown lint |
+| `validate.yml` | Every PR | `terraform/**`, `ansible/**`, `gitops/**` | Terraform plan, Ansible lint, manifest validation |
+| `deploy.yml` | Merge to main | `terraform/**`, `ansible/**` | Terraform apply, Ansible bootstrap |
+
+**Why two separate validate/deploy files instead of one?**
+The split keeps the read-only safety check (validate) clearly separated from the destructive operation (apply). It also means validate can run on untrusted PRs without needing the same secret access that apply requires.
+
+**Why not one pipeline per component (terraform, ansible, gitops)?**
+The terraform → ansible dependency makes this impractical: Ansible needs node IPs from Terraform output, which would require complex cross-workflow artifact passing or querying GCP directly. For a team larger than ~5 engineers or a multi-customer setup, per-component pipelines with a dedicated orchestration layer (e.g. Atlantis for Terraform) would be the right call.
+
+**Approval gate:**
+The PR review process is the implicit approval gate before `terraform apply` runs. For stricter control, configure required reviewers on the `dev` GitHub Environment in repo settings — this adds an explicit human approval step before deploy.yml proceeds.
+
+---
+
 ## 🔄 GitOps Change Flow
 
 Every change to the cluster goes through Git — no one runs `kubectl apply` by hand. Here's what happens from the moment you push code to the moment the cluster reflects it:
