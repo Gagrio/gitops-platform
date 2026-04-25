@@ -30,7 +30,7 @@ step()  { echo -e "\n${GREEN}▶ $1${NC}"; }
 # ── prerequisites ─────────────────────────────────────────────────────────────
 step "Checking prerequisites"
 for cmd in gcloud terraform gh curl ssh-keygen; do
-  command -v "$cmd" &>/dev/null || error "'$cmd' not found. See docs/deployment-guide.md for install instructions."
+  command -v "$cmd" &>/dev/null || error "'$cmd' not found. See Documentation/Deployment guide.md for install instructions."
 done
 
 gcloud auth print-access-token &>/dev/null 2>&1 \

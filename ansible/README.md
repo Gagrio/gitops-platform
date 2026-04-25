@@ -87,4 +87,4 @@ ansible-playbook playbooks/bootstrap.yml \
 
 The `GCP_PROJECT` environment variable is set in the CI job so the `gcp_compute` inventory plugin knows which project to query. No inventory artifact is generated or passed between jobs.
 
-For the full CI pipeline picture, see the [Technical Analysis](../Documentation/technical-analysis.md).
+For the full CI pipeline picture, see the [Technical Analysis](../Documentation/Technical analysis.md).
