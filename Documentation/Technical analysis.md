@@ -214,6 +214,10 @@ Three workflows cover the full repository. Flux handles everything after the dep
 
   Merge to main
       │
+      └── (nothing deploys automatically — merge is always safe)
+
+  Manual trigger: Actions → Deploy → Run workflow → choose environment
+      │
       ├── Job 1: terraform apply
       │         provisions VMs, VPC, firewall, GCS bucket, IAM
       │         outputs: node IPs → passed to Job 2

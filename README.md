@@ -26,7 +26,7 @@ Three tiers of automation. After the one-time bootstrap you never touch Terrafor
 | Tier | Who | When |
 |---|---|---|
 | **One-time bootstrap** | You, manually | Once, to wire up CI |
-| **Infrastructure changes** | GitHub Actions | On every merge to `main` touching `terraform/` or `ansible/` |
+| **Infrastructure changes** | GitHub Actions | Manually triggered — you choose the target environment |
 | **Application/config changes** | Flux | Every 60 seconds, continuously |
 
 The normal workflow is: **open a PR → merge → CI and Flux handle everything**. 🙌
@@ -104,7 +104,7 @@ cd enclaive-platform-challenge
 bash scripts/bootstrap.sh
 ```
 
-The script handles everything else: GCS state bucket, SSH key pair, `terraform apply` on the bootstrap module, and all GitHub Actions secrets. After it completes, merge any change to `main` touching `terraform/` or `ansible/` and CI deploys the full stack automatically.
+The script handles everything else: GCS state bucket, SSH key pair, `terraform apply` on the bootstrap module, and all GitHub Actions secrets. After it completes, trigger a deploy from **GitHub → Actions → Deploy → Run workflow** and choose the target environment.
 
 📖 Full instructions: [Documentation/Deployment%20guide.md](Documentation/Deployment%20guide.md)
 

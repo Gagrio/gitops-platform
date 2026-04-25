@@ -1,22 +1,14 @@
 ---
-# Runs on every merge to main that touches Terraform or Ansible (targets dev by default).
-# Can also be triggered manually via workflow_dispatch to target any environment.
+# Triggered manually — always choose the target environment explicitly.
 # Application changes go through Flux — no CI job needed for those.
 name: Deploy
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - "terraform/**"
-      - "ansible/**"
   workflow_dispatch:
     inputs:
       environment:
         description: "Target environment"
         required: true
-        default: "dev"
         type: choice
         options:
           - dev
@@ -30,9 +22,9 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
-    environment: ${{ inputs.environment || 'dev' }}
+    environment: \${{ inputs.environment }}
     env:
-      ENVIRONMENT: ${{ inputs.environment || 'dev' }}
+      ENVIRONMENT: \${{ inputs.environment }}
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_region: ${{ secrets.GCP_REGION }}
       TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
@@ -68,9 +60,9 @@ jobs:
     name: Ansible Bootstrap
     runs-on: ubuntu-latest
     needs: terraform-apply
-    environment: ${{ inputs.environment || 'dev' }}
+    environment: \${{ inputs.environment }}
     env:
-      ENVIRONMENT: ${{ inputs.environment || 'dev' }}
+      ENVIRONMENT: \${{ inputs.environment }}
       GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}    # read by gcp_compute inventory plugin
     steps:
       - name: Checkout
@@ -123,9 +115,9 @@ jobs:
     name: Smoke Test
     runs-on: ubuntu-latest
     needs: ansible-bootstrap
-    environment: ${{ inputs.environment || 'dev' }}
+    environment: \${{ inputs.environment }}
     env:
-      ENVIRONMENT: ${{ inputs.environment || 'dev' }}
+      ENVIRONMENT: \${{ inputs.environment }}
     steps:
       - name: Authenticate to GCP via Workload Identity Federation
         uses: google-github-actions/auth@v2
