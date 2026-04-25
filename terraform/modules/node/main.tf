@@ -12,7 +12,7 @@ resource "google_compute_address" "internal" {
   project      = var.project_id
 }
 
-# GCE VM running Ubuntu 22.04 LTS
+# GCE VM running Ubuntu 24.04 LTS
 resource "google_compute_instance" "node" {
   name         = var.name
   machine_type = var.machine_type
@@ -21,8 +21,8 @@ resource "google_compute_instance" "node" {
 
   boot_disk {
     initialize_params {
-      # Ubuntu 22.04 LTS — stable, well-supported by k3s and Ansible roles
-      image = "ubuntu-os-cloud/ubuntu-2204-lts"
+      # Ubuntu 24.04 LTS — current LTS, supported by k3s and all Ansible roles
+      image = "ubuntu-os-cloud/ubuntu-2404-lts"
       size  = 50
       type  = "pd-balanced"
     }

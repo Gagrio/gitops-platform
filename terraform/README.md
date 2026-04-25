@@ -4,7 +4,7 @@ This directory provisions all the cloud infrastructure on **Google Cloud Platfor
 
 ## 🧱 What gets provisioned
 
-- 🖥️ **3 GCE virtual machines** — one control plane node, two workers, all running Ubuntu 22.04 LTS
+- 🖥️ **3 GCE virtual machines** — one control plane node, two workers, all running Ubuntu 24.04 LTS
 - 🌐 **VPC and subnet** — isolated network at `10.0.0.0/24`
 - 🔥 **Firewall rules** — SSH and Kubernetes API restricted to your IP only; internal cluster traffic open
 - 📌 **Static internal IPs** — reserved per node, mandatory for k3s stability (node identity breaks if IPs change)
