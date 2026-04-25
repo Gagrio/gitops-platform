@@ -1,2 +1,150 @@
-# enclaive-platform-challenge
-Repo for the enclaive challenge
+# Enclaive Lead Infrastructure Engineer — Platform Challenge
+
+A GitOps-driven infrastructure platform that provisions a Kubernetes cluster on Google Cloud, bootstraps it with Ansible, and manages all workloads through Flux. The end state is a platform where no one manually applies Kubernetes manifests — everything is declared in Git and reconciled automatically.
+
+---
+
+## What it builds
+
+| Layer | Technology | What it does |
+|---|---|---|
+| Infrastructure | Terraform + GCP | 3 GCE VMs, VPC, firewall, GCS bucket, IAM, Secret Manager |
+| Node bootstrap | Ansible + k3s | OS hardening, k3s install, Flux bootstrap |
+| GitOps engine | Flux v2 | Reconciles all cluster state from this repo |
+| Database | CloudNativePG | 3-instance Postgres HA cluster with WAL archiving + scheduled backups |
+| Demo app | Adminer | Database UI, exercises the full Postgres connection end-to-end |
+| Observability | Prometheus + Grafana | CloudNativePG metrics, Grafana dashboard provisioned automatically |
+| Secrets | External Secrets Operator | Pulls credentials from GCP Secret Manager — nothing in Git |
+| CI | GitHub Actions (3 workflows) | Validate on PR, apply on merge, smoke test after bootstrap |
+
+---
+
+## How it works
+
+Three tiers of automation — after the one-time bootstrap, you never touch Terraform or Ansible again:
+
+| Tier | Who | When |
+|---|---|---|
+| One-time bootstrap | You, manually | Once, to wire up CI |
+| Infrastructure changes | GitHub Actions | On every merge to `main` touching `terraform/` or `ansible/` |
+| Application/config changes | Flux | Every 60 seconds, continuously |
+
+The normal workflow is: **open a PR → merge → CI and Flux handle everything**.
+
+---
+
+## Repository structure
+
+```
+enclaive-platform-challenge/
+├── terraform/
+│   ├── bootstrap/              # One-time: CI identity, WIF, GitHub secrets
+│   ├── modules/
+│   │   ├── network/            # VPC and subnet
+│   │   ├── node/               # GCE VM with static internal IP and labels
+│   │   ├── firewall/           # Ingress rules (SSH, API, HTTP/S, intra-cluster)
+│   │   ├── gcs/                # GCS backup bucket
+│   │   └── iam/                # Service accounts, Secret Manager, WIF bindings
+│   └── environments/
+│       ├── dev/                # dev entry point (e2-standard-2, local-path storage)
+│       └── prod/               # prod entry point (n2-standard-4, GCE PD storage)
+│
+├── ansible/
+│   ├── playbooks/bootstrap.yml # Single idempotent playbook
+│   ├── inventory/
+│   │   └── gcp_compute.yaml    # Dynamic inventory — queries GCP by label at runtime
+│   └── roles/
+│       ├── base/               # OS packages, sysctl, swap, br_netfilter
+│       ├── security/           # SSH hardening, fail2ban, UFW
+│       ├── kubernetes/         # k3s control plane + worker join
+│       └── flux/               # Flux CLI, bootstrap, cluster-vars ConfigMaps
+│
+├── gitops/
+│   ├── clusters/
+│   │   ├── common/             # Shared platform: ingress-nginx, ESO, Prometheus stack
+│   │   ├── dev/                # Dev entry point — points Flux at common + operators + apps
+│   │   └── prod/               # Prod entry point (same manifests, different vars)
+│   ├── operators/postgres/     # CloudNativePG Cluster CR, ScheduledBackup, ExternalSecrets
+│   └── applications/demo-app/  # Adminer Deployment, Service, Ingress
+│
+├── .github/workflows/
+│   ├── repo-checks.yml         # All PRs: secret scan, YAML lint, Markdown lint
+│   ├── validate.yml            # terraform plan, ansible-lint, kubeconform
+│   └── deploy.yml              # terraform apply → ansible bootstrap → smoke test
+│
+├── scripts/
+│   └── bootstrap.sh            # Automates the one-time setup (run once, then CI takes over)
+│
+└── docs/
+    ├── architecture.md         # Platform diagram, CI design, GitOps flow, storage, backups
+    ├── deployment-guide.md     # Step-by-step: bootstrap → deploy → verify → day-2
+    ├── technical-analysis.md   # Deep dive: every component, every design decision
+    └── leadership.md           # Team organisation, multi-env strategy, reliability, security
+```
+
+---
+
+## Quick start
+
+Two manual steps, then everything is automated:
+
+```bash
+# 1. Authenticate
+gcloud auth login && gcloud auth application-default login
+gh auth login
+
+# 2. Clone and run the bootstrap script
+git clone https://github.com/Gagrio/enclaive-platform-challenge
+cd enclaive-platform-challenge
+bash scripts/bootstrap.sh
+```
+
+The script handles everything else: state bucket, SSH key generation, Terraform apply on the bootstrap module, and setting all GitHub Actions secrets. After it completes, merge any change to `main` touching `terraform/` or `ansible/` and CI deploys the full stack.
+
+Full instructions: [docs/deployment-guide.md](docs/deployment-guide.md)
+
+---
+
+## Documentation
+
+| Document | What it covers |
+|---|---|
+| [Architecture](docs/architecture.md) | Platform diagram, CI pipeline design, GitOps flow, firewall, storage, backup/restore |
+| [Deployment Guide](docs/deployment-guide.md) | Step-by-step bootstrap, deploy, verify, day-2 operations, teardown, troubleshooting |
+| [Technical Analysis](docs/technical-analysis.md) | Design rationale for every component and every decision made |
+| [Leadership Answers](docs/leadership.md) | Team organisation, multi-environment strategy, reliability, security |
+
+---
+
+## Timetable
+
+Approximate time spent per sub-task:
+
+| Sub-task | Time |
+|---|---|
+| Terraform modules (network, node, firewall, gcs, iam) | ~5h |
+| Terraform environments (dev/prod) + bootstrap module | ~2h |
+| Ansible roles (base, kubernetes, security, flux) | ~4h |
+| GitOps structure (Flux bootstrap, kustomizations, sources) | ~2h |
+| CloudNativePG (Cluster CR, ScheduledBackup, ExternalSecrets, PodMonitor) | ~3h |
+| Observability (Prometheus stack, Grafana, dashboard, secret via ESO) | ~2h |
+| CI pipelines (repo-checks, validate, deploy + dynamic inventory + smoke test) | ~4h |
+| Bootstrap automation script | ~1h |
+| Documentation (architecture, deployment guide, technical analysis) | ~4h |
+| Review, bug fixes, iteration | ~3h |
+| **Total** | **~30h** |
+
+---
+
+## LLM use
+
+**Claude (claude-sonnet-4-6 via Claude Code)** was used throughout this project as a pair programmer — actively for code generation, review, debugging, and documentation writing.
+
+Specifically:
+- All Terraform, Ansible, and Kubernetes manifests were written with Claude generating first drafts, which were reviewed, corrected, and iterated on
+- Claude caught several real bugs during a file-by-file review: `ansible_default_ipv4.address` returning the external GCE IP, `br_netfilter` being loaded after the sysctl settings that depend on it, `hosts: workers` vs `hosts: worker` mismatch in the playbook
+- CI workflows and the bootstrap script were designed and written collaboratively
+- All documentation was written with Claude; the content reflects genuine design decisions made during the build
+- The conversation was iterative — Claude proposed, the author reviewed, corrected direction, and approved or rejected changes
+
+Claude was used exactly as it would be in daily engineering work: as a fast, capable collaborator that still requires human judgement to direct and verify.
