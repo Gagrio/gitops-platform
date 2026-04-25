@@ -1,6 +1,7 @@
 ---
 # Runs on every PR that touches Terraform, Ansible, or GitOps manifests.
 # Validates without making any changes — safe to run on untrusted PRs.
+# Terraform validation runs as a matrix across both environments so both are checked on every PR.
 name: Validate
 
 on:
@@ -17,8 +18,11 @@ permissions:
 
 jobs:
   terraform-validate:
-    name: Terraform Validate & Plan
+    name: Terraform Validate & Plan (${{ matrix.environment }})
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        environment: [dev, prod]
     env:
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_region: ${{ secrets.GCP_REGION }}
@@ -40,22 +44,22 @@ jobs:
           terraform_version: "~1.7"
 
       - name: Terraform fmt check
-        working-directory: terraform/environments/dev
+        working-directory: terraform/environments/${{ matrix.environment }}
         run: terraform fmt -check -recursive
 
       - name: Terraform init
-        working-directory: terraform/environments/dev
+        working-directory: terraform/environments/${{ matrix.environment }}
         run: |
           terraform init \
             -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-            -backend-config="prefix=environments/dev"
+            -backend-config="prefix=environments/${{ matrix.environment }}"
 
       - name: Terraform validate
-        working-directory: terraform/environments/dev
+        working-directory: terraform/environments/${{ matrix.environment }}
         run: terraform validate
 
       - name: Terraform plan
-        working-directory: terraform/environments/dev
+        working-directory: terraform/environments/${{ matrix.environment }}
         run: terraform plan -no-color
 
   ansible-lint:
