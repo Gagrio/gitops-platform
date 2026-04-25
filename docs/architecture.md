@@ -1,6 +1,6 @@
-# Architecture Overview
+# 🏛️ Architecture Overview
 
-## Platform Diagram
+## 🗺️ Platform Diagram
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────────────┐
@@ -85,7 +85,9 @@
 
 ---
 
-## GitOps Change Flow
+## 🔄 GitOps Change Flow
+
+Every change to the cluster goes through Git — no one runs `kubectl apply` by hand. Here's what happens from the moment you push code to the moment the cluster reflects it:
 
 ```
   Engineer              GitHub             flux-system            Cluster
@@ -102,7 +104,9 @@
 
 ---
 
-## PostgreSQL Minor Upgrade Flow
+## ⬆️ PostgreSQL Minor Upgrade Flow
+
+Upgrading Postgres is a Git operation. The operator handles the rolling restart with zero downtime — replicas restart first, then the primary fails over to a healthy replica before restarting itself:
 
 ```
   1. Engineer bumps imageName in Cluster CR and opens PR
@@ -118,7 +122,9 @@
 
 ---
 
-## Backup and Restore
+## 💾 Backup and Restore
+
+Two mechanisms run in parallel to protect your data. WAL archiving gives you continuous coverage; base backups give you a faster restore starting point:
 
 ```
   BACKUP

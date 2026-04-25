@@ -1,197 +1,201 @@
-# Technical Analysis: GitOps Platform Challenge
+# 🔬 Technical Analysis: GitOps Platform
 
-## Purpose of This Document
+## 🎯 Purpose of This Document
 
-This document explains what we are building, why each component exists, and how they fit together. It is written as a step-by-step walkthrough — not a how-to guide, but a conceptual map so that anyone reading the repository can understand the full system before diving into any individual piece.
+This document explains what we're building, why each component exists, and how they all fit together. It's a conceptual walkthrough — not a how-to guide, but a map so that anyone reading the repository can understand the full system before diving into any individual piece.
 
 ---
 
-## What We Are Building
+## 🧱 What We're Building
 
 A **GitOps-driven infrastructure platform** that:
 
-1. Provisions cloud infrastructure on Google Cloud using Terraform
-2. Bootstraps a Kubernetes cluster on those VMs using Ansible
-3. Installs Flux as the GitOps engine to manage everything that runs inside the cluster
-4. Deploys a production-grade PostgreSQL cluster managed by the CloudNativePG operator
-5. Deploys a simple demo application that reads and writes to that database
-6. Provides observability (metrics, alerting), automated backups to GCS, and a defined upgrade path
+1. 🏗️ Provisions cloud infrastructure on Google Cloud using Terraform
+2. ⚙️ Bootstraps a Kubernetes cluster on those VMs using Ansible
+3. 🔄 Installs Flux as the GitOps engine to manage everything that runs inside the cluster
+4. 🐘 Deploys a production-grade PostgreSQL cluster managed by the CloudNativePG operator
+5. 🖥️ Deploys a simple demo application that reads and writes to that database
+6. 📊 Provides observability (metrics, alerting), automated backups to GCS, and a defined upgrade path
 
 The end state is a platform where **no one manually applies Kubernetes manifests**. Everything is declared in Git and reconciled automatically by Flux.
 
 ---
 
-## Step 1 — Infrastructure Provisioning (Terraform)
+## 🏗️ Step 1 — Infrastructure Provisioning (Terraform)
 
 ### What it does
 
 Terraform creates the raw infrastructure on Google Cloud before any software is installed. It provisions three GCE virtual machines, a VPC network with a subnet, firewall rules, and SSH keys.
 
-### Why three nodes
+### 🤔 Why three nodes?
 
 Kubernetes requires an odd number of control plane nodes to maintain etcd quorum. With a single control node and two workers we get a realistic cluster layout: the control plane manages scheduling and the API server, while the workers run the actual workloads.
 
-### Module structure
+### 📦 Module structure
 
-The Terraform code is split into reusable modules (`network`, `node`, `firewall`) and environment-specific entry points (`environments/dev`, `environments/prod`). This means dev and prod share the same module logic but can differ in machine size, region, or replica count by changing input variables.
+The Terraform code is split into reusable modules (`network`, `node`, `firewall`) and environment-specific entry points (`environments/dev`, `environments/prod`). This means dev and prod share the same module logic but can differ in machine size, region, or replica count by changing input variables — no module code changes needed.
 
-### What Terraform does NOT do
+### 🚫 What Terraform does NOT do
 
 Terraform stops at the infrastructure layer. It provisions machines and outputs their IP addresses. It does not install software, configure nodes, or touch the cluster. Everything from OS configuration onward is Ansible's job.
 
-### Important provisioning notes
+### ⚠️ Important provisioning notes
 
-**Static internal IPs are mandatory.** k3s embeds node identity (etcd membership, certificates, kubelet registration) at bootstrap time. If a VM's internal IP changes after the cluster is formed — even due to a stop/start — the cluster will break and require a full node rejoin. Every GCE node must be provisioned with a reserved static internal IP (`google_compute_address` with `address_type = "INTERNAL"`), not a dynamic one.
+**Static internal IPs are mandatory.** k3s embeds node identity (etcd membership, certificates, kubelet registration) at bootstrap time. If a VM's internal IP changes after the cluster is formed — even due to a stop/start — the cluster will break and require a full node rejoin. Every GCE node gets a `google_compute_address` resource with `address_type = INTERNAL`.
 
-**GCS bucket must be force-destroyable.** GCP refuses to delete a non-empty bucket. Set `force_destroy = true` on the backup bucket resource so that `terraform destroy` completes cleanly without manual intervention.
+**GCS bucket must be force-destroyable.** GCP refuses to delete a non-empty bucket. `force_destroy = true` on the backup bucket resource ensures `terraform destroy` completes cleanly without manual intervention.
 
 ---
 
-## Step 2 — Node Configuration and Kubernetes Bootstrap (Ansible)
+## ⚙️ Step 2 — Node Configuration and Kubernetes Bootstrap (Ansible)
 
 ### What it does
 
 Ansible connects to the three GCE nodes over SSH and takes them from a blank OS to a fully bootstrapped, GitOps-ready Kubernetes cluster. It runs four roles in sequence:
 
-1. **Base role** — applies to all nodes: installs system packages, sets kernel parameters required by Kubernetes (e.g. `br_netfilter`, IP forwarding), configures the container runtime (containerd).
+1. 🖥️ **Base role** — applies to all nodes: installs system packages, sets kernel parameters required by Kubernetes (`br_netfilter`, IP forwarding), disables swap.
 
-2. **Kubernetes role** — installs k3s. On `node-01` it starts the k3s server (control plane). On `node-02` and `node-03` it joins the cluster as k3s agents using a token generated by the server. k3s bundles the API server, scheduler, controller manager, etcd, and the Flannel CNI into a single binary, which keeps the bootstrap simple without sacrificing production viability.
+2. ☸️ **Kubernetes role** — installs k3s. On `node-01` it starts the k3s server (control plane). On `node-02` and `node-03` it joins the cluster as k3s agents using a token generated by the server. k3s bundles the API server, scheduler, controller manager, etcd, and the Flannel CNI into a single binary — simple to bootstrap without sacrificing production viability.
 
-3. **Security role** — hardens the nodes: disables unnecessary services, configures the firewall at the OS level (complementing GCP's VPC firewall), and ensures kubelet configurations follow security baselines.
+3. 🔒 **Security role** — hardens the nodes: SSH configuration, fail2ban, UFW firewall at the OS level (complementing GCP's VPC firewall).
 
-4. **Flux role** — bootstraps Flux onto the running cluster. Applies the Flux install manifests via `kubectl`, then creates the initial `GitRepository` CR (pointing at this repository) and the root `Kustomization` CR (pointing at `gitops/clusters/<env>`). From this point Flux is live and self-managing — any further changes to the cluster happen through Git, not through Ansible.
+4. 🔄 **Flux role** — bootstraps Flux onto the running cluster. Installs the Flux CLI, runs `flux bootstrap github`, and creates the `cluster-global` and `cluster-vars` ConfigMaps that Flux uses for per-environment variable substitution. From this point Flux is live and self-managing — any further changes to the cluster happen through Git, not Ansible.
 
-Ansible is the right tool for steps 1–4 because all of them require a shell on the node or a kubeconfig that only exists after k3s is running. There is no clean way to do this in Terraform without resorting to `remote-exec` provisioners, which are considered an anti-pattern and are hard to debug.
+### 🤔 Why Ansible and not Terraform provisioners?
 
-### Why k3s
+Ansible is the right tool here because all of these steps require a shell on the node or a kubeconfig that only exists after k3s is running. There's no clean way to do this in Terraform without resorting to `remote-exec` provisioners, which are an anti-pattern and notoriously difficult to debug and re-run.
 
-k3s is a fully conformant Kubernetes distribution that is significantly easier to install and operate than kubeadm while being suitable for production workloads. It ships with sensible defaults and reduces the operational surface area during bootstrapping.
+### 🤔 Why k3s?
 
-### The output
+k3s is a fully conformant Kubernetes distribution that is significantly easier to install and operate than kubeadm while being production-viable. It's developed and maintained by Rancher (part of SUSE), ships with sensible defaults, and reduces the operational surface area during bootstrapping.
 
-At the end of the Ansible run, the cluster has three nodes in `Ready` state, Flux controllers are running in `flux-system`, and Flux has already begun reconciling the `gitops/` tree. The CI job is done — everything from here is driven by Git.
+### 🏁 The output
+
+At the end of the Ansible run, all three nodes are in `Ready` state, Flux controllers are running in `flux-system`, and Flux has already begun reconciling the `gitops/` tree. The CI job is done — everything from here is driven by Git.
 
 ---
 
-## Step 3 — GitOps (Flux)
+## 🔄 Step 3 — GitOps (Flux)
 
 ### What GitOps means here
 
-GitOps means the Git repository is the **single source of truth** for cluster state. Flux, running inside the cluster, continuously compares what is in Git against what is running in the cluster. If there is a difference, Flux reconciles the cluster toward Git — not the other way around.
+GitOps means the Git repository is the **single source of truth** for cluster state. Flux, running inside the cluster, continuously compares what's in Git against what's running in the cluster. If there's a difference, Flux reconciles the cluster toward Git — not the other way around.
 
-No engineer runs `kubectl apply` to deploy things. They open a PR, get it reviewed, merge it, and Flux takes it from there.
+No engineer runs `kubectl apply` to deploy things. They open a PR, get it reviewed, merge it, and Flux takes it from there. 🙌
 
-### How Flux is installed
+### 🤔 Why Flux over ArgoCD?
 
-Flux is installed by the Ansible `flux` role as the final step of the bootstrap playbook — not by a separate CI job or CLI command. By the time the `ansible-playbook` run completes, Flux is already running and already watching the repository. There is no manual step and no third CI job.
+The challenge lists ArgoCD as the preferred option. We chose Flux because it integrates more naturally with the Ansible bootstrap pattern — Flux can be fully installed and configured via `flux bootstrap github` in the Ansible `flux` role, without needing a separate running cluster or a third CI job. The end result is identical: a GitOps loop that keeps the cluster in sync with the repository.
 
-### What Flux reconciles
+### 🗂️ What Flux reconciles
 
-The `gitops/` directory in the repository is the root of everything Flux manages. It is structured by environment (`clusters/dev`, `clusters/prod`) and by concern:
+The `gitops/` directory is the root of everything Flux manages. It's structured by environment (`clusters/dev`, `clusters/prod`) and by concern:
 
-- `infrastructure/` — installs cluster-wide tooling: the CloudNativePG operator, External Secrets Operator, Prometheus stack, cert-manager
-- `operators/postgres/` — the CloudNativePG `Cluster` CR and related backup/monitoring configuration
-- `applications/demo-app/` — the demo API deployment, service, and ingress
+- 🛠️ `infrastructure/` — cluster-wide tooling: ingress-nginx, External Secrets Operator, kube-prometheus-stack
+- 🐘 `operators/postgres/` — the CloudNativePG `Cluster` CR and related backup/monitoring configuration
+- 🖥️ `applications/demo-app/` — the Adminer deployment, service, and ingress
 
 Flux processes these in dependency order: infrastructure must be healthy before operators are applied, operators before applications.
 
+### 🌍 Per-environment configuration
+
+The manifests in `infrastructure/`, `operators/`, and `applications/` are **shared** — both dev and prod point at the same files, no duplication. Environment-specific values flow through two ConfigMaps created by Ansible during bootstrap:
+
+- `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this single-project setup)
+- `cluster-vars` — `ENVIRONMENT` and `REGION` (per-environment; REGION can differ if dev and prod run in different GCP regions)
+
 ---
 
-## Step 4 — Operator-Managed PostgreSQL (CloudNativePG)
+## 🐘 Step 4 — Operator-Managed PostgreSQL (CloudNativePG)
 
-### Why an operator instead of a Helm chart
+### 🤔 Why an operator instead of a Helm chart?
 
-A Helm chart for PostgreSQL would deploy a database but would have no awareness of PostgreSQL internals. An operator extends Kubernetes with PostgreSQL-specific knowledge: it understands primary/replica topology, knows how to execute a safe failover, manages WAL shipping, and handles rolling restarts in the correct order. It turns Kubernetes into a system that actively manages the database lifecycle, not just its container lifecycle.
+A Helm chart for PostgreSQL deploys a database but has no awareness of PostgreSQL internals. An operator extends Kubernetes with PostgreSQL-specific knowledge: it understands primary/replica topology, knows how to execute a safe failover, manages WAL shipping, and handles rolling restarts in the correct order. It turns Kubernetes into a system that actively manages the database lifecycle, not just its container lifecycle.
 
-### What the Cluster CR defines
+### 📋 What the Cluster CR defines
 
-The `Cluster` custom resource is the declarative description of the entire PostgreSQL cluster. It specifies:
+The `Cluster` custom resource is the declarative description of the entire PostgreSQL cluster:
 
-- Number of instances (3: one primary, two replicas)
-- PostgreSQL version and container image
-- Storage size and StorageClass for persistent volumes
-- Replication mode and failover behaviour
-- Backup configuration (target GCS bucket, schedule, retention)
-- Resource requests and limits
+- 3 instances (one primary, two replicas)
+- PostgreSQL 16 via the official CNPG image
+- 20Gi persistent volume per instance
+- Streaming replication with automatic failover
+- GCS backup configuration (WAL archiving + scheduled base backups)
+- `PodMonitor` for Prometheus scraping
+- Topology spread constraints so each instance lands on a different node
 
-When this CR is applied (by Flux), the CloudNativePG operator creates three pods, configures streaming replication between them, and begins managing their lifecycle.
+### 🔁 Failover
 
-### Failover
+If the primary pod (`pg-1`) fails, CloudNativePG automatically promotes the most up-to-date replica to primary. No manual intervention needed. The Service resource always points to the current primary so applications reconnect without configuration changes.
 
-If the primary pod (`pg-1`) fails, CloudNativePG automatically promotes the most up-to-date replica to primary. No manual intervention is needed. The Service resource always points to the current primary, so applications reconnect without configuration changes.
-
-### Backups
+### 💾 Backups
 
 Two mechanisms run in parallel:
 
 - **WAL archiving** — PostgreSQL continuously ships Write-Ahead Log segments to a GCS bucket. This is the foundation of point-in-time recovery.
-- **Scheduled base backups** — A `ScheduledBackup` CR triggers a full base backup (via `barman-cloud-backup`) daily. Combined with WAL, this allows recovery to any point within the retention window.
+- **Scheduled base backups** — triggers a full base backup via `barman-cloud-backup` daily. Combined with WAL, this allows recovery to any point within the retention window (30 days in dev, 90 in prod).
 
-### Secrets
+### 🔐 Secrets
 
-Database credentials are not stored in Git. The External Secrets Operator pulls them from Google Secret Manager and materialises them as Kubernetes Secrets in the `postgres` namespace. The CloudNativePG `Cluster` CR references these secrets by name.
+Database credentials are not stored in Git. The External Secrets Operator pulls them from Google Secret Manager and materialises them as Kubernetes Secrets in the `postgres` namespace. CloudNativePG references these secrets by name — it never sees a plaintext password.
 
 ---
 
-## Step 5 — Demo Application
+## 🖥️ Step 5 — Demo Application
 
 ### What it is
 
-The requirement is to deploy something that connects to the operator-managed database and is managed via GitOps. No custom application needs to be built. We use **Adminer** — a single, lightweight Docker image that provides a database UI and immediately demonstrates a working Postgres connection. It satisfies the requirement without writing any application code.
+The requirement is to deploy something that connects to the operator-managed database and is managed via GitOps. No custom application needs to be built. We use **Adminer** — a single, lightweight Docker image that provides a full database UI and immediately demonstrates a working Postgres connection. It satisfies the requirement without writing any application code.
 
-### How it is deployed
+### How it's deployed
 
-Adminer is defined as a Kubernetes `Deployment` and `Service` in `gitops/applications/demo-app/`. Flux reconciles it the same way it reconciles everything else. The Postgres connection details are injected via environment variables referencing a Secret managed by the External Secrets Operator.
-
----
-
-## Step 6 — Observability (Prometheus + Grafana)
-
-### What is instrumented
-
-CloudNativePG exposes PostgreSQL metrics natively. A `PodMonitor` CR in the `postgres` namespace tells Prometheus to scrape those metrics. The demo app exposes a `/metrics` endpoint that is also scraped.
-
-Grafana is pre-provisioned with dashboards for PostgreSQL cluster health (replication lag, connections, WAL activity) and application-level metrics.
-
-Alertmanager is configured with alerting rules for: primary unavailable, replication lag exceeding threshold, backup failing.
+Adminer is defined as a `Deployment` and `Service` in `gitops/applications/demo-app/`. Flux reconciles it the same way it reconciles everything else. The Postgres server address is pre-configured via an environment variable pointing to the CloudNativePG read-write service.
 
 ---
 
-## How the Pieces Depend on Each Other
+## 📊 Step 6 — Observability (Prometheus + Grafana)
+
+### What's instrumented
+
+CloudNativePG exposes PostgreSQL metrics natively via a `PodMonitor` CR that tells Prometheus to scrape those metrics. Grafana is pre-provisioned with the official CloudNativePG dashboard (Grafana ID 20417) for PostgreSQL cluster health — replication lag, connections, WAL activity.
+
+---
+
+## 🧩 How the Pieces Depend on Each Other
 
 ```
   Terraform
       │  provisions VMs, VPC, firewall, GCS bucket, IAM
       ▼
   Ansible  (single playbook run)
-      │  roles/base        → OS packages, kernel params, containerd
+      │  roles/base        → OS packages, kernel params
+      │  roles/security    → SSH hardening, fail2ban, UFW
       │  roles/kubernetes  → k3s install, cluster join
-      │  roles/security    → OS hardening, firewall
       │  roles/flux        → Flux install, GitRepository CR, Kustomization CR
       ▼
   Flux reconciles infrastructure/
-      │  installs: CloudNativePG operator, External Secrets Operator, Prometheus stack
+      │  installs: ingress-nginx, External Secrets Operator, Prometheus stack
       ▼
   Flux reconciles operators/postgres/
-      │  creates: Cluster CR, ScheduledBackup CR, PodMonitor CR
+      │  creates: Cluster CR, ExternalSecrets, PodMonitor CR
       ▼
   CloudNativePG operator
       │  provisions: pg-1 (primary), pg-2 (replica), pg-3 (replica)
       │  begins: WAL archiving to GCS
       ▼
   Flux reconciles applications/demo-app/
-      │  deploys: demo-api pods
+      │  deploys: Adminer
       ▼
-  Platform is live
+  Platform is live 🚀
 ```
 
-Each layer depends on the one above it. If you need to rebuild from scratch, you work top to bottom. If you need to change something in production, you change it in Git and let Flux propagate it downward.
+Each layer depends on the one above it. Rebuild from scratch? Work top to bottom. Change something in production? Change it in Git and let Flux propagate it.
 
 ---
 
-## CI Pipeline
+## 🚦 CI Pipeline
 
-The CI pipeline has two jobs that run sequentially on push to `main`. Flux handles everything after that autonomously — there is no third job.
+Two jobs run sequentially on push to `main`. Flux handles everything after that autonomously.
 
 ```
   PR opened
@@ -200,39 +204,34 @@ The CI pipeline has two jobs that run sequentially on push to `main`. Flux handl
       ├── ansible-lint
       └── kubeconform (validate gitops/ manifests)
 
-      All must pass before merge is allowed.
+      All must pass before merge is allowed ✅
 
   Merge to main
       │
-      ├── path: terraform/**
-      │       │
-      │       └── Job 1: terraform apply
-      │               provisions VMs, VPC, firewall,
-      │               GCS bucket, IAM, static IPs
-      │               outputs: node IPs → passed to Job 2
+      ├── Job 1: terraform apply
+      │         provisions VMs, VPC, firewall, GCS bucket, IAM
+      │         outputs: node IPs → passed to Job 2
       │
-      └── path: ansible/**  (or triggered by Job 1 completion)
-              │
-              └── Job 2: ansible-playbook bootstrap.yml
-                      roles/base        (OS, containerd)
-                      roles/kubernetes  (k3s)
-                      roles/security    (hardening)
-                      roles/flux        (Flux install + GitRepository + Kustomization CRs)
+      └── Job 2: ansible-playbook bootstrap.yml
+                roles/base       (OS prep)
+                roles/security   (hardening)
+                roles/kubernetes (k3s)
+                roles/flux       (Flux install + bootstrap)
 
-  CI is done. Flux takes over.
+  CI is done. Flux takes over. 🔄
       │
       └── Flux reconciles gitops/ continuously (60s loop)
               infrastructure/ → operators/postgres/ → applications/demo-app/
 ```
 
-### What CI does NOT do
+### ❌ What CI does NOT do
 
-- CI never runs `kubectl apply` directly
-- CI never installs operators or deploys applications — that is Flux's job
-- Changes to `gitops/**` do not trigger any CI job; Flux picks them up automatically on its next reconcile loop
-- There is no manual `flux bootstrap` step — it is handled by the Ansible `flux` role in Job 2
+- Run `kubectl apply` directly
+- Install operators or deploy applications — that's Flux's job
+- React to changes in `gitops/` — Flux picks those up automatically, no CI trigger needed
+- Run a separate `flux bootstrap` step — the Ansible `flux` role handles it
 
-### PR validation gates
+### ✅ PR validation gates
 
 | Check | Tool | Blocks merge |
 |---|---|---|
@@ -244,13 +243,13 @@ The CI pipeline has two jobs that run sequentially on push to `main`. Flux handl
 
 ---
 
-## Day-2 Operations Summary
+## 🗓️ Day-2 Operations Summary
 
-| Operation          | How it works                                                                 |
-|--------------------|------------------------------------------------------------------------------|
-| Deploy a change    | Open PR → merge → Flux reconciles within 60s                                 |
-| Postgres upgrade   | Bump image tag in Cluster CR → merge → operator does rolling restart         |
-| Point-in-time restore | Create new Cluster CR with `bootstrap.recovery.recoveryTarget`            |
-| Scale workers      | Change node count in Terraform, run `terraform apply`, rejoin via Ansible    |
-| Rotate a secret    | Update value in Google Secret Manager → ESO syncs → pods restart             |
-| Add a new customer | New environment directory in `gitops/clusters/` + new Terraform workspace    |
+| Operation | How it works |
+|---|---|
+| 🚀 Deploy a change | Open PR → merge → Flux reconciles within 60s |
+| ⬆️ Postgres upgrade | Bump image tag in Cluster CR → merge → operator does rolling restart |
+| ⏪ Point-in-time restore | New Cluster CR with `bootstrap.recovery.recoveryTarget` |
+| 📈 Scale workers | Change node count in Terraform → CI applies → Ansible rejoin |
+| 🔑 Rotate a secret | Update value in Google Secret Manager → ESO syncs → pods restart |
+| 🌍 Add a new environment | New `gitops/clusters/<env>/` + new Terraform environment directory |
