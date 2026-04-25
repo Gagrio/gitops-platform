@@ -6,4 +6,5 @@ resources:
   - sources.yaml
   - ingress-nginx.yaml
   - external-secrets.yaml
+  - grafana-secret.yaml
   - kube-prometheus-stack.yaml

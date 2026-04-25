@@ -70,8 +70,26 @@ module "nodes" {
   ssh_public_key        = var.ssh_public_key
 }
 
-# Auto-generated Postgres passwords — never entered or seen by a human
+# Auto-generated passwords — never entered or seen by a human
 # Stored in Terraform state (GCS, encrypted at rest, IAM-restricted) and in Secret Manager
+resource "random_password" "grafana_admin" {
+  length  = 32
+  special = false
+}
+
+resource "google_secret_manager_secret" "grafana_admin_password" {
+  secret_id = "${var.environment}-grafana-admin-password"
+  project   = var.project_id
+  replication {
+    auto {}
+  }
+}
+
+resource "google_secret_manager_secret_version" "grafana_admin_password" {
+  secret      = google_secret_manager_secret.grafana_admin_password.id
+  secret_data = random_password.grafana_admin.result
+}
+
 resource "random_password" "pg_superuser" {
   length  = 32
   special = false

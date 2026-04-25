@@ -15,9 +15,13 @@ spec:
         name: prometheus-community
         namespace: flux-system
       interval: 24h
+  valuesFrom:
+    - kind: Secret
+      name: grafana-admin-password
+      valuesKey: password
+      targetPath: grafana.adminPassword
   values:
     grafana:
-      adminPassword: prom-operator
       persistence:
         enabled: false
       dashboardProviders:

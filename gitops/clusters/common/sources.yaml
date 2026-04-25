@@ -1,9 +1,10 @@
 ---
-# HelmRepository sources for all charts used in this cluster
+# HelmRepository sources for all charts used in this cluster.
+# Each entry registers a Helm repo — chart names are referenced by HelmRelease resources.
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: ingress-nginx
+  name: ingress-nginx      # chart: ingress-nginx  (used in ingress-nginx.yaml)
   namespace: flux-system
 spec:
   interval: 24h
@@ -12,7 +13,7 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: external-secrets
+  name: external-secrets   # chart: external-secrets  (used in external-secrets.yaml)
   namespace: flux-system
 spec:
   interval: 24h
@@ -21,7 +22,7 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: prometheus-community
+  name: prometheus-community   # chart: kube-prometheus-stack  (used in kube-prometheus-stack.yaml)
   namespace: flux-system
 spec:
   interval: 24h
@@ -30,7 +31,7 @@ spec:
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
-  name: cloudnativepg
+  name: cloudnativepg      # chart: cloudnative-pg  (used in operators/postgres/cloudnativepg.yaml)
   namespace: flux-system
 spec:
   interval: 24h
