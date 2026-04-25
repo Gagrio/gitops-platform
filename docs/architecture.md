@@ -103,6 +103,9 @@ The split keeps the read-only safety check (validate) clearly separated from the
 **Why not one pipeline per component (terraform, ansible, gitops)?**
 The terraform → ansible dependency makes this impractical: Ansible needs node IPs from Terraform output, which would require complex cross-workflow artifact passing or querying GCP directly. For a team larger than ~5 engineers or a multi-customer setup, per-component pipelines with a dedicated orchestration layer (e.g. Atlantis for Terraform) would be the right call.
 
+**Inventory — no artifact passing between jobs:**
+Ansible inventory is dynamic. The `gcp_compute` plugin (from the `google.cloud` Galaxy collection) queries GCP at Ansible runtime for nodes matching `labels.environment=dev`, then groups them by their `role` label (`control` / `worker`). These labels are set by the Terraform node module at provisioning time, so no inventory file is generated, uploaded, or downloaded between CI jobs — each job authenticates to GCP independently via Workload Identity Federation.
+
 **Approval gate:**
 The PR review process is the implicit approval gate before `terraform apply` runs. For stricter control, configure required reviewers on the `dev` GitHub Environment in repo settings — this adds an explicit human approval step before deploy.yml proceeds.
 
