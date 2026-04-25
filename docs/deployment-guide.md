@@ -112,7 +112,7 @@ Merge any change to `main` that touches `terraform/` or `ansible/`. The CI pipel
 
 1. **Validate** (on PR) — secret scanning, YAML lint, markdown lint (all PRs); plus `terraform fmt`, `terraform validate`, `terraform plan`, `ansible-lint`, `kubeconform` (when relevant paths change)
 2. **Apply** (on merge) — `terraform apply` provisions all GCP infrastructure; passwords are auto-generated and stored in Secret Manager
-3. **Bootstrap** (on merge) — `ansible-playbook bootstrap.yml` installs k3s and Flux on the nodes
+3. **Bootstrap** (on merge) — `ansible-playbook bootstrap.yml` installs k3s and Flux on the nodes; inventory is built dynamically from GCP labels — no static file needed
 4. **Smoke test** (on merge, after bootstrap) — SSHes into the control plane and verifies nodes are Ready, all Flux kustomizations reconciled, Postgres cluster healthy, Adminer pod running
 
 Monitor the run in **GitHub → Actions**. Total CI time is approximately 10–15 minutes.

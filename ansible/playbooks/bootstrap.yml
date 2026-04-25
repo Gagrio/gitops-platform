@@ -20,7 +20,7 @@
         k3s_role: control
 
 - name: Install k3s workers
-  hosts: workers
+  hosts: worker    # matches the GCE label value set by Terraform (labels.role=worker)
   become: true
   roles:
     - role: kubernetes

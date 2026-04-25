@@ -243,6 +243,7 @@ Three workflows cover the full repository. Flux handles everything after the dep
 - Install operators or deploy applications — that's Flux's job
 - React to changes in `gitops/` — Flux picks those up automatically, no CI trigger needed
 - Run a separate `flux bootstrap` step — the Ansible `flux` role handles it
+- Generate or pass a static inventory between jobs — the `gcp_compute` dynamic inventory plugin queries GCP directly at runtime
 
 ### ✅ PR validation gates
 

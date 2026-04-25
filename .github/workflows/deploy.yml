@@ -26,9 +26,6 @@ jobs:
       TF_VAR_region: ${{ secrets.GCP_REGION }}
       TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
-    outputs:
-      node_external_ips: ${{ steps.tf-output.outputs.node_external_ips }}
-      gcp_project_id: ${{ steps.tf-output.outputs.gcp_project_id }}
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -56,50 +53,22 @@ jobs:
         working-directory: terraform/environments/dev
         run: terraform apply -auto-approve
 
-      - name: Generate Ansible inventory from Terraform output
-        id: tf-output
-        working-directory: terraform/environments/dev
-        run: |
-          EXTERNAL_IPS=$(terraform output -json node_external_ips)
-          echo "node_external_ips=$EXTERNAL_IPS" >> "$GITHUB_OUTPUT"
-          python3 - "$EXTERNAL_IPS" <<'PYEOF'
-          import json, sys
-          ips = json.loads(sys.argv[1])
-          control = {k: v for k, v in ips.items() if "01" in k}
-          workers = {k: v for k, v in ips.items() if "01" not in k}
-          lines = ["[control]"]
-          for name, ip in control.items():
-              lines.append(f"{name} ansible_host={ip}")
-          lines += ["", "[workers]"]
-          for name, ip in workers.items():
-              lines.append(f"{name} ansible_host={ip}")
-          lines += ["", "[k3s_cluster:children]", "control", "workers"]
-          inventory = "\n".join(lines) + "\n"
-          with open("../../../ansible/inventory/hosts.ini", "w") as f:
-              f.write(inventory)
-          print(inventory)
-          PYEOF
-
-      - name: Upload inventory as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: ansible-inventory
-          path: ansible/inventory/hosts.ini
-
   ansible-bootstrap:
     name: Ansible Bootstrap
     runs-on: ubuntu-latest
     needs: terraform-apply
     environment: dev
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}    # read by gcp_compute inventory plugin
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Download inventory artifact
-        uses: actions/download-artifact@v4
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
         with:
-          name: ansible-inventory
-          path: ansible/inventory
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Install Ansible
         run: |
@@ -114,9 +83,12 @@ jobs:
 
       - name: Wait for SSH to be available on all nodes
         run: |
-          for ip in $(grep 'ansible_host=' ansible/inventory/hosts.ini | awk -F= '{print $2}'); do
+          for ip in $(gcloud compute instances list \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --filter="labels.environment=dev" \
+            --format="get(networkInterfaces[0].accessConfigs[0].natIP)"); do
             echo "Waiting for SSH on $ip..."
-            timeout 120 bash -c "until ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci ansible@$ip 'echo ok' 2>/dev/null; do sleep 5; done"
+            timeout 120 bash -c "until ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci ubuntu@$ip 'echo ok' 2>/dev/null; do sleep 5; done"
           done
 
       - name: Run bootstrap playbook
@@ -138,11 +110,11 @@ jobs:
     needs: ansible-bootstrap
     environment: dev
     steps:
-      - name: Download inventory artifact
-        uses: actions/download-artifact@v4
+      - name: Authenticate to GCP via Workload Identity Federation
+        uses: google-github-actions/auth@v2
         with:
-          name: ansible-inventory
-          path: ansible/inventory
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
       - name: Write SSH private key
         run: |
@@ -153,7 +125,10 @@ jobs:
       - name: Get control plane IP
         id: cp-ip
         run: |
-          CP_IP=$(grep 'ansible_host=' ansible/inventory/hosts.ini | head -1 | awk -F= '{print $2}')
+          CP_IP=$(gcloud compute instances list \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --filter="labels.environment=dev AND labels.role=control" \
+            --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
           echo "ip=$CP_IP" >> "$GITHUB_OUTPUT"
 
       - name: Run smoke tests on control plane

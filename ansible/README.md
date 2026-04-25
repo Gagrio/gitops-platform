@@ -64,30 +64,27 @@ Finally, it copies the kubeconfig to `/tmp/kubeconfig-enclaive-dev` so the CI jo
 
 ## Inventory
 
-CI generates `inventory/hosts.ini` automatically from Terraform output after `terraform apply` completes. The Python script in the deploy workflow reads the `node_external_ips` Terraform output (a JSON map of node name → IP) and writes a correctly grouped INI file:
+Inventory is **dynamic** — no static `hosts.ini` is generated or uploaded between CI jobs. The `inventory/gcp_compute.yaml` config tells Ansible to query GCP directly for nodes matching `labels.environment=dev`, then group them by their `role` label:
 
-```ini
-[control]
-dev-node-01 ansible_host=<ip>
+| GCE label | Ansible group |
+|---|---|
+| `labels.role=control` | `control` |
+| `labels.role=worker` | `worker` |
+| all matched nodes | `k3s_cluster` |
 
-[workers]
-dev-node-02 ansible_host=<ip>
-dev-node-03 ansible_host=<ip>
+These labels are set by the Terraform node module at provisioning time — no coordination needed between CI jobs. Authentication uses Application Default Credentials: `gcloud auth application-default login` locally, or the WIF token automatically in CI.
 
-[k3s_cluster:children]
-control
-workers
-```
-
-See `inventory/hosts.ini.example` for the expected shape.
+For prod, create `inventory/gcp_compute_prod.yaml` with `filters: [labels.environment=prod]`.
 
 ## How CI uses Ansible
 
-CI runs the bootstrap playbook automatically as the second job in the deploy pipeline, after `terraform apply` completes. It installs Ansible and the required Galaxy collections, writes the SSH private key from GitHub secrets, waits for SSH to be available on all nodes, then runs the playbook with the project ID, region, and environment passed as extra variables:
+CI runs the bootstrap playbook as the second job in the deploy pipeline, after `terraform apply` completes. It authenticates to GCP via WIF (so the dynamic inventory can query GCP), installs Ansible and Galaxy collections, writes the SSH private key, waits for SSH on all nodes, then runs the playbook:
 
 ```bash
 ansible-playbook playbooks/bootstrap.yml \
   --extra-vars "gcp_project_id=... region=... environment=dev subnet_cidr=... storage_class=local-path github_token=..."
 ```
+
+The `GCP_PROJECT` environment variable is set in the CI job so the `gcp_compute` inventory plugin knows which project to query. No inventory artifact is generated or passed between jobs.
 
 For the full CI pipeline picture, see the [Technical Analysis](../docs/technical-analysis.md).

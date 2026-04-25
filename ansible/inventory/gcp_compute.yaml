@@ -1,0 +1,32 @@
+---
+# Dynamic inventory — discovers cluster nodes from GCP automatically.
+# No static hosts.ini needed; nodes are grouped by their GCE 'role' label,
+# which is set by the Terraform node module at provisioning time.
+#
+# Auth: Application Default Credentials (ADC). Locally run
+# `gcloud auth application-default login`. In CI, WIF provides the token.
+# Project: read from the GCP_PROJECT environment variable.
+#
+# For prod, create gcp_compute_prod.yaml with filters: [labels.environment=prod].
+plugin: google.cloud.gcp_compute
+
+# Scope to this environment's nodes only
+filters:
+  - labels.environment=dev
+
+auth_kind: application
+
+# Groups nodes by their 'role' GCE label — creates 'control' and 'worker' groups.
+# These match the role values set in Terraform (var.role = "control" or "worker").
+keyed_groups:
+  - key: labels.role
+    prefix: ""
+    separator: ""
+
+# All matched nodes also belong to k3s_cluster (used by the base and security plays)
+groups:
+  k3s_cluster: "true"
+
+# SSH via the instance's external IP
+compose:
+  ansible_host: networkInterfaces[0].accessConfigs[0].natIP
