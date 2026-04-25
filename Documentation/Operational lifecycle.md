@@ -133,6 +133,8 @@ The GitOps-native solution for zero-downtime k3s upgrades is the **k3s System Up
 
 This approach keeps the upgrade fully declarative and GitOps-driven without modifying the bootstrap playbook.
 
+> 🧹 **After the upgrade completes:** remove the Plan CR from Git and merge. Flux will delete it from the cluster. If you leave it in place, the controller is harmless — it will see the nodes are already at the target version and do nothing. However, leaving it means you now have two sources of truth for the k3s version (`all.yml` and the Plan CR) which will diverge on the next upgrade if you only update one of them.
+
 ### 🔄 Flux Upgrade
 
 Bump `flux_version` in `ansible/inventory/group_vars/all.yml` and merge. The Ansible `flux` role re-runs `flux bootstrap github`, which upgrades the Flux controllers in place.
