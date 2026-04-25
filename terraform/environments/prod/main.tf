@@ -67,7 +67,9 @@ module "nodes" {
   ssh_public_key        = var.ssh_public_key
 }
 
-# Auto-generated passwords — never entered or seen by a human
+# Passwords are treated as infrastructure — generated here at provisioning time,
+# stored in Secret Manager, and pulled into the cluster by ESO at deploy time.
+# They are never entered or seen by a human.
 resource "random_password" "grafana_admin" {
   length  = 32
   special = false
