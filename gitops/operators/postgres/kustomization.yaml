@@ -5,3 +5,4 @@ resources:
   - cloudnativepg.yaml
   - external-secrets.yaml
   - cluster.yaml
+  - scheduled-backup.yaml

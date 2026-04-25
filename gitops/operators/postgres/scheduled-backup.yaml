@@ -1,0 +1,14 @@
+---
+# ScheduledBackup — triggers a full base backup daily at 02:00 UTC.
+# WAL archiving runs continuously (configured in the Cluster CR); base backups
+# give CNPG a faster restore starting point so it doesn't replay WAL from scratch.
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: pg-scheduled-backup
+  namespace: postgres
+spec:
+  schedule: "0 2 * * *"        # daily at 02:00 UTC
+  backupOwnerReference: self    # backup object is owned by this ScheduledBackup, cleaned up with it
+  cluster:
+    name: pg

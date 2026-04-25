@@ -83,6 +83,8 @@
    GCS Bucket  ◄── CloudNativePG barman-cloud-backup (WAL + base backups)
 ```
 
+> 📝 **Demo application note:** The example application is **Adminer** — a lightweight database UI that connects to Postgres and can read and write data interactively. The task suggests a containerized REST API as one possible example; Adminer was chosen instead because it requires zero application code, directly exercises database authentication and network connectivity, and makes the end-to-end verification immediately visual. In a real platform, this slot would be replaced by a customer workload.
+
 ---
 
 ## 🔄 GitOps Change Flow
@@ -119,6 +121,18 @@ Upgrading Postgres is a Git operation. The operator handles the rolling restart 
         primary pg-1  →  failover to pg-2  →  restart  →  rejoin as replica
   6. Zero downtime — replicas serve reads throughout
 ```
+
+---
+
+## 🌐 Ingress and Load Balancing
+
+External traffic reaches the cluster through **ingress-nginx**, which is exposed via a Service of type `LoadBalancer`. On this platform, k3s's built-in **ServiceLB** (klipper-lb) handles that Service — it binds ports 80 and 443 directly on every node, so any node's external IP can receive traffic.
+
+```
+External client → node external IP (port 80/443) → k3s ServiceLB → ingress-nginx → application
+```
+
+> 💰 A proper production setup would sit a **GCE L4 load balancer** in front of the nodes, giving you a single stable public IP and automatic failover if a node goes down. We deliberately skip this here to keep infrastructure costs to a minimum — this is a demo platform, not a customer-facing service.
 
 ---
 
