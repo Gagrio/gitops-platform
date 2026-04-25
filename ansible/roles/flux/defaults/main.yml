@@ -11,3 +11,6 @@ kubeconfig_artifact_path: /tmp/kubeconfig-enclaive-dev
 # Injected by CI via --extra-vars
 gcp_project_id: ""
 environment: dev
+# Region defaults to europe-west1; can be overridden per environment via --extra-vars
+# if dev and prod need to run in different regions
+region: europe-west1

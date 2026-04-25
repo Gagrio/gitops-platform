@@ -128,7 +128,7 @@ Open `terraform.tfvars` and fill in your values:
 gcloud projects list
 ```
 
-**`region`** — GCP region to deploy into. Default is `europe-west1`. See https://cloud.google.com/compute/docs/regions-zones.
+**`region`** — GCP region to deploy into. Default is `europe-west1`. See https://cloud.google.com/compute/docs/regions-zones. Both dev and prod use the same region by default; if you want them in different regions, set a different value here per environment and update the corresponding Ansible `--extra-vars` in the CI workflow.
 
 **`github_owner`** — Your GitHub username.
 

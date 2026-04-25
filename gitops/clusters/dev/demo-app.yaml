@@ -19,4 +19,6 @@ spec:
   postBuild:
     substituteFrom:
       - kind: ConfigMap
+        name: cluster-global
+      - kind: ConfigMap
         name: cluster-vars

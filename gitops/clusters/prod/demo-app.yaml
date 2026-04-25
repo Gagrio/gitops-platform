@@ -1,0 +1,25 @@
+---
+# Flux Kustomization — reconciles the demo application (Adminer).
+# Points at the same shared base as dev; environment-specific values come from
+# cluster-global and cluster-vars ConfigMaps created by the Ansible bootstrap.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: demo-app
+  namespace: flux-system
+spec:
+  interval: 5m
+  path: ./gitops/applications/demo-app
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: postgres
+  timeout: 5m
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-global
+      - kind: ConfigMap
+        name: cluster-vars

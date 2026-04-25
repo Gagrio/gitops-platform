@@ -70,8 +70,21 @@
       - "{{ flux_namespace }}"
   changed_when: false
 
-# cluster-vars ConfigMap supplies ${GCP_PROJECT_ID} and ${ENVIRONMENT} to Flux
-# post-build variable substitution — used by infrastructure, postgres, and demo-app Kustomizations
+# cluster-global — GCP_PROJECT_ID; shared across all environments in the same project
+- name: Create cluster-global ConfigMap for Flux substitution
+  ansible.builtin.shell: |
+    kubectl --kubeconfig={{ kubeconfig_path }} apply -f - <<'EOF'
+    apiVersion: v1
+    kind: ConfigMap
+    metadata:
+      name: cluster-global
+      namespace: {{ flux_namespace }}
+    data:
+      GCP_PROJECT_ID: "{{ gcp_project_id }}"
+    EOF
+  changed_when: true
+
+# cluster-vars — per-environment values; REGION can differ across environments
 - name: Create cluster-vars ConfigMap for Flux substitution
   ansible.builtin.shell: |
     kubectl --kubeconfig={{ kubeconfig_path }} apply -f - <<'EOF'
@@ -81,8 +94,8 @@
       name: cluster-vars
       namespace: {{ flux_namespace }}
     data:
-      GCP_PROJECT_ID: "{{ gcp_project_id }}"
       ENVIRONMENT: "{{ environment }}"
+      REGION: "{{ region }}"
     EOF
   changed_when: true
 

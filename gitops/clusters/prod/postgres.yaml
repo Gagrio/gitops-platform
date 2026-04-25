@@ -1,0 +1,25 @@
+---
+# Flux Kustomization — reconciles CloudNativePG operator and the HA Postgres cluster.
+# Points at the same shared base as dev; environment-specific values come from
+# cluster-global and cluster-vars ConfigMaps created by the Ansible bootstrap.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: postgres
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./gitops/operators/postgres
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: infrastructure
+  timeout: 10m
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-global
+      - kind: ConfigMap
+        name: cluster-vars
