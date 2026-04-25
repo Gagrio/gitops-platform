@@ -1,0 +1,143 @@
+# 🔒 Security Considerations
+
+## 🎯 Purpose of This Document
+
+This document describes the security posture of the platform: how secrets are managed, how access is controlled at every layer, and what network policies are in place. It also flags where the current design makes deliberate trade-offs for simplicity and what production hardening would look like.
+
+---
+
+## 🔑 Secret Management
+
+### 🤔 The core principle
+
+**No secret ever enters Git or a CI log.** All credentials flow through a single path:
+
+```
+  Terraform (random_password)
+      │  generates at provisioning time
+      ▼
+  Google Secret Manager
+      │  stores as a versioned secret
+      ▼
+  External Secrets Operator
+      │  polls Secret Manager, materialises as a Kubernetes Secret
+      ▼
+  Workload
+      │  references the Secret by name — never sees a plaintext value
+      ▼
+  CloudNativePG / Grafana / Adminer
+```
+
+Passwords are treated as infrastructure: generated once at `terraform apply` time by `random_password`, stored in Secret Manager, and never entered or seen by a human. If a password needs to be rotated, update the value in Secret Manager — ESO will sync it into the cluster within its poll interval and the workload will restart with the new credential.
+
+### 📋 What lives in Secret Manager
+
+| Secret | Who creates it | Who reads it |
+|---|---|---|
+| `dev-pg-app-password` | Terraform `random_password` | ESO → CloudNativePG |
+| `dev-pg-superuser-password` | Terraform `random_password` | ESO → CloudNativePG |
+| `dev-grafana-admin-password` | Terraform `random_password` | ESO → Grafana (via `valuesFrom`) |
+
+### 🔍 What gitleaks enforces
+
+The `repo-checks.yml` workflow runs [gitleaks](https://github.com/gitleaks/gitleaks) on every PR. It scans the full diff for known secret patterns (API keys, passwords, private keys, tokens) and blocks merge if anything is found. This is the safety net that prevents accidental secret commits.
+
+### 🔐 GitHub Actions secrets
+
+CI secrets (GCP project ID, WIF provider, service account, SSH key, state bucket) are stored in GitHub Actions secrets scoped to the `dev` Environment. The SSH private key in particular is set via `gh secret set` in the bootstrap script — it never passes through Terraform state, a file on disk, or a CI log.
+
+---
+
+## 👤 Access Control
+
+### ☁️ GCP access from CI (Workload Identity Federation)
+
+CI never uses a long-lived service account key. Instead, GitHub Actions authenticates to GCP via **Workload Identity Federation**:
+
+```
+  GitHub Actions job
+      │  presents OIDC token (signed by GitHub)
+      ▼
+  GCP Workload Identity Pool
+      │  validates token against GitHub's JWKS endpoint
+      │  checks repo and branch conditions
+      ▼
+  GCP service account impersonation
+      │  grants a short-lived access token (1h TTL)
+      ▼
+  CI job has GCP access with no stored key
+```
+
+The bootstrap Terraform module sets this up automatically. The CI service account is granted only the permissions it needs:
+
+| Permission | Why |
+|---|---|
+| `compute.instances.*` | Provision and query GCE VMs |
+| `storage.objects.*` | Read/write Terraform state and backups |
+| `secretmanager.versions.access` | Read secrets for ESO |
+| `iam.serviceAccounts.actAs` | Required for WIF impersonation |
+
+### 🔒 Cluster access (kubectl)
+
+The Kubernetes API (port 6443) is firewalled to the `admin_cidr` only — not open to the internet. CI does not talk to the API directly; the smoke test SSHes into the control plane and runs `sudo k3s kubectl` there.
+
+RBAC is managed by k3s defaults. For production, define explicit ClusterRoles and RoleBindings scoped to each team or application.
+
+### 🛡️ Node access (SSH)
+
+SSH (port 22) is currently open to `0.0.0.0/0`. This is a deliberate trade-off: GitHub Actions runners have dynamic IPs so a CIDR restriction is not practical. The real protection layers are:
+
+- **Key-based auth only** — password login is disabled by the `security` Ansible role
+- **Root login disabled** — `PermitRootLogin no` in sshd_config
+- **fail2ban** — bans IPs after repeated failed attempts (1h ban window)
+
+> 🏭 For production: replace the open SSH rule with **GCP Cloud IAP tunneling** (`gcloud compute ssh --tunnel-through-iap`). IAP proxies SSH through Google's infrastructure — nodes need no public SSH port at all, and access is controlled by Google IAM.
+
+### 🌐 GitHub Environment protection
+
+GitHub Actions secrets are scoped to the `dev` Environment. To add a human approval gate before `terraform apply` runs, configure **required reviewers** on the Environment in repository settings. Without this, any merge to `main` triggers an immediate deploy.
+
+---
+
+## 🌐 Network Policies
+
+### 🔥 GCE VPC Firewall
+
+The firewall is the first layer of network security — it controls what traffic reaches the nodes at all:
+
+| Rule | Source | Ports | Reason |
+|---|---|---|---|
+| SSH | `0.0.0.0/0` | 22 | GitHub Actions runners have dynamic IPs — see trade-off note above |
+| Kubernetes API | `admin_cidr` | 6443 | Operator access only; CI uses SSH |
+| HTTP/HTTPS ingress | `0.0.0.0/0` | 80, 443 | Public-facing application traffic |
+| Internal cluster | `subnet_cidr` | all | k3s, Flannel CNI, and kubelet need unrestricted intra-node communication |
+
+### 🔄 Intra-cluster traffic (Flannel CNI)
+
+k3s uses **Flannel** as its CNI. Flannel provides overlay networking so pods can communicate across nodes, but it does not enforce any NetworkPolicies by default — all pod-to-pod traffic is allowed.
+
+### ⚙️ Kubernetes NetworkPolicies
+
+No NetworkPolicies are currently defined. This is acceptable for a demo platform. For production, the recommended baseline:
+
+```yaml
+# Default-deny all ingress and egress within each namespace
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: default-deny-all
+spec:
+  podSelector: {}
+  policyTypes:
+    - Ingress
+    - Egress
+```
+
+Then add explicit allow rules for:
+- Postgres replicas ↔ primary (streaming replication, port 5432)
+- ESO → Secret Manager (egress to Google APIs)
+- Prometheus → PodMonitor targets (scrape port 9187)
+- ingress-nginx → application pods (port 8080)
+- DNS resolution (egress to kube-dns, port 53)
+
+> ⚠️ Flannel does not enforce NetworkPolicies natively. To enforce them, install a NetworkPolicy-capable CNI alongside Flannel (e.g. Calico in policy-only mode) or switch to a CNI that supports them natively (e.g. Cilium). In k3s, this requires replacing Flannel entirely.

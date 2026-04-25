@@ -110,7 +110,9 @@ The script handles everything else: GCS state bucket, SSH key pair, `terraform a
 
 | Document | What it covers |
 |---|---|
-| [Architecture](docs/architecture.md) | Platform diagram, CI pipeline design, GitOps flow, firewall design, storage, backup/restore |
+| [Architecture](docs/architecture.md) | Platform diagram, CI pipeline design, GitOps flow, firewall design, storage |
+| [Operational Lifecycle](docs/operations.md) | Backup, restore, upgrades, monitoring, scaling |
+| [Security Considerations](docs/security.md) | Secret management, access control, network policies |
 | [Deployment Guide](docs/deployment-guide.md) | Bootstrap, deploy, verify, day-2 operations, teardown, troubleshooting |
 | [Technical Analysis](docs/technical-analysis.md) | Design rationale for every component and every decision made |
 | [Leadership Answers](docs/leadership.md) | Team organisation, multi-environment strategy, reliability, security |
