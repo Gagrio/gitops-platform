@@ -95,6 +95,7 @@
     data:
       ENVIRONMENT: "{{ environment }}"
       REGION: "{{ region }}"
+      STORAGE_CLASS: "{{ storage_class }}"
     EOF
 
 - name: Copy kubeconfig for CI artifact upload

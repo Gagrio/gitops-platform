@@ -122,6 +122,21 @@ Upgrading Postgres is a Git operation. The operator handles the rolling restart 
 
 ---
 
+## 🗄️ Storage Design
+
+Postgres storage is intentionally different between environments. The `STORAGE_CLASS` variable is injected into each cluster's `cluster-vars` ConfigMap by Ansible at bootstrap time, and Flux substitutes it into the `Cluster` CR:
+
+| Environment | Storage Class | Backing | Durability |
+|-------------|---------------|---------|------------|
+| dev | `local-path` | Local node disk (k3s default) | Lost if the node VM is deleted — CNPG resyncs from primary |
+| prod | `standard` | GCE Persistent Disk (CSI driver) | Network-attached, survives node deletion |
+
+> ⚠️ For prod to work, the GCE PD CSI driver must be installed on the cluster before Flux reconciles the Postgres `Cluster` CR. Without it, the `standard` StorageClass does not exist and the PVCs will not be provisioned.
+
+The tradeoff is deliberate: dev uses local disk for simplicity and speed; prod uses network-attached storage for the durability guarantees a production database requires.
+
+---
+
 ## 💾 Backup and Restore
 
 Two mechanisms run in parallel to protect your data. WAL archiving gives you continuous coverage; base backups give you a faster restore starting point:

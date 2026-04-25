@@ -41,9 +41,12 @@ spec:
       wal_level: logical
 
   # Storage — one PVC per instance
+  # dev:  local-path (k3s default, local node disk — fast but lost if the node is deleted)
+  # prod: standard   (GCE Persistent Disk via CSI driver — network-attached, survives node deletion)
+  # ${STORAGE_CLASS} is injected by Flux from the cluster-vars ConfigMap
   storage:
     size: 20Gi
-    storageClass: local-path
+    storageClass: "${STORAGE_CLASS}"
 
   # GCS backups — uses the node SA (attached to GCE instances) for authentication
   backup:

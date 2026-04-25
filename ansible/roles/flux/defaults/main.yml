@@ -14,3 +14,6 @@ environment: dev
 # Region defaults to europe-west1; can be overridden per environment via --extra-vars
 # if dev and prod need to run in different regions
 region: europe-west1
+# dev: local-path (k3s default, local disk — not durable across node deletion)
+# prod: standard  (GCE Persistent Disk via CSI driver — survives node deletion)
+storage_class: local-path

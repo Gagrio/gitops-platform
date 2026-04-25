@@ -123,7 +123,7 @@ jobs:
         working-directory: ansible
         run: |
           ansible-playbook playbooks/bootstrap.yml \
-            --extra-vars "gcp_project_id=${{ secrets.GCP_PROJECT_ID }} region=${{ secrets.GCP_REGION }} environment=dev subnet_cidr=${{ secrets.SUBNET_CIDR }} github_token=${{ secrets.GITHUB_TOKEN }}"
+            --extra-vars "gcp_project_id=${{ secrets.GCP_PROJECT_ID }} region=${{ secrets.GCP_REGION }} environment=dev subnet_cidr=${{ secrets.SUBNET_CIDR }} storage_class=local-path github_token=${{ secrets.GITHUB_TOKEN }}"
 
       - name: Upload kubeconfig artifact
         uses: actions/upload-artifact@v4
