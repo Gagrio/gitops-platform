@@ -218,11 +218,18 @@ Three workflows cover the full repository. Flux handles everything after the dep
       │         provisions VMs, VPC, firewall, GCS bucket, IAM
       │         outputs: node IPs → passed to Job 2
       │
-      └── Job 2: ansible-playbook bootstrap.yml
-                roles/base       (OS prep)
-                roles/security   (hardening)
-                roles/kubernetes (k3s)
-                roles/flux       (Flux install + bootstrap)
+      ├── Job 2: ansible-playbook bootstrap.yml
+      │         roles/base       (OS prep)
+      │         roles/security   (hardening)
+      │         roles/kubernetes (k3s)
+      │         roles/flux       (Flux install + bootstrap)
+      │
+      └── Job 3: smoke test (SSH into control plane)
+                kubectl wait nodes Ready
+                kubectl wait kustomizations Ready (up to 10 min)
+                kubectl wait cluster/pg Ready
+                kubectl wait pods -n postgres Ready
+                kubectl wait pods -n demo-app Ready
 
   CI is done. Flux takes over. 🔄
       │

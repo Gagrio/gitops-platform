@@ -145,6 +145,19 @@ Upgrading Postgres is a Git operation. The operator handles the rolling restart 
 
 ---
 
+## 🔥 Firewall Design
+
+| Rule | Source | Ports | Reason |
+|---|---|---|---|
+| SSH | `0.0.0.0/0` | 22 | GitHub Actions runners have dynamic IPs — cannot restrict by CIDR. Key-based auth + fail2ban is the protection layer. |
+| Kubernetes API | `admin_cidr` | 6443 | Operator personal access only. CI does not need direct API access — it uses SSH to run kubectl on the control plane. |
+| HTTP/HTTPS ingress | `0.0.0.0/0` | 80, 443 | Public-facing services. |
+| Internal cluster | `subnet_cidr` | all | k3s, Flannel CNI, and kubelet require unrestricted intra-node communication. |
+
+> 🏭 For production, replace the open SSH rule with **GCP Cloud IAP tunneling** (`gcloud compute ssh --tunnel-through-iap`). IAP proxies SSH through Google's infrastructure so nodes never need a public SSH port at all.
+
+---
+
 ## 🌐 Ingress and Load Balancing
 
 External traffic reaches the cluster through **ingress-nginx**, which is exposed via a Service of type `LoadBalancer`. On this platform, k3s's built-in **ServiceLB** (klipper-lb) handles that Service — it binds ports 80 and 443 directly on every node, so any node's external IP can receive traffic.

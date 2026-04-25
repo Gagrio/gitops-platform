@@ -3,7 +3,9 @@
 # to the operator's CIDR. HTTP/HTTPS is open. Intra-cluster traffic is unrestricted
 # within the subnet so k3s and Flannel CNI can operate freely.
 
-# Allow SSH from operator CIDR only — locked down, not world-open
+# Allow SSH from anywhere — GitHub Actions runners have dynamic IPs so we cannot restrict
+# by source CIDR. Key-based auth (enforced by the security Ansible role) and fail2ban
+# are the real protection here. For production, replace this with GCP Cloud IAP tunneling.
 resource "google_compute_firewall" "ssh" {
   name    = "${var.environment}-allow-ssh"
   network = var.network_name
@@ -14,11 +16,11 @@ resource "google_compute_firewall" "ssh" {
     ports    = ["22"]
   }
 
-  source_ranges = [var.admin_cidr]
+  source_ranges = ["0.0.0.0/0"]
   target_tags   = [var.environment]
 }
 
-# Allow Kubernetes API server from operator CIDR only
+# Allow Kubernetes API server from operator CIDR only — CI does not need direct API access
 resource "google_compute_firewall" "k8s_api" {
   name    = "${var.environment}-allow-k8s-api"
   network = var.network_name
