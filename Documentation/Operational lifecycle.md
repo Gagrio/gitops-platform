@@ -137,7 +137,7 @@ This approach keeps the upgrade fully declarative and GitOps-driven without modi
 
 ### 🔄 Flux Upgrade
 
-Bump `flux_version` in `ansible/inventory/group_vars/all.yml` and merge. The Ansible `flux` role re-runs `flux bootstrap github`, which upgrades the Flux controllers in place.
+Bump `flux_version` in `ansible/roles/flux/defaults/main.yml` and merge. The Ansible `flux` role re-runs `flux bootstrap github`, which upgrades the Flux controllers in place.
 
 ---
 

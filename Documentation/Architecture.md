@@ -9,7 +9,7 @@
 │   terraform/           ansible/           gitops/            Documentation/     │
 │   ├── modules/         ├── roles/         ├── clusters/       ├── Architecture   │
 │   │   ├── network      │   ├── base       │   ├── dev/        ├── Operations     │
-│   │   ├── node         │   ├── k8s        │   └── prod/       └── Security       │
+│   │   ├── node         │   ├── kubernetes │   └── prod/       └── Security       │
 │   │   └── firewall     │   └── security   ├── operators/                        │
 │   └── environments/    └── playbooks/     │   └── postgres/                     │
 │       ├── dev/             bootstrap.yml  └── applications/                     │
