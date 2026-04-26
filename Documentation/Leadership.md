@@ -1,134 +1,56 @@
-# 👥 Leadership Answers
-
-## 🎯 Purpose of This Document
-
-Short written answers to the four leadership questions from the challenge brief. Each section covers the topic as it applies to operating a GitOps infrastructure platform at Enclaive's scale — small team, many customer environments, security-first.
+# Leadership Answers
 
 ---
 
-## 1️⃣ Team Organisation
+## 1. Team Organisation
 
-**How would you organise a team of 3 DevOps engineers deploying this platform?**
+With three people you can't have strict roles — everyone does a bit of everything. But someone still needs to be the go-to person for each area, otherwise nothing gets properly owned. I'd split it roughly like this: one person looks after the infrastructure (Terraform, Ansible, CI pipelines), one focuses on what runs inside the cluster (Flux, operators, monitoring), and one keeps production healthy — backups, alerts, runbooks, what to do when things break. They help each other out, but you know who to call when something goes wrong.
 
-### 🧑‍💼 Roles
+Everything goes through a PR. No pushing directly to main, even for small things. If you're touching Terraform, the infra person has to review it. We also post the terraform plan output in the PR automatically — that way nobody is surprised by what's about to change. Same goes for runbooks; they live in Git and go through review like everything else.
 
-Rather than rigid job titles, each engineer owns a primary domain — but owns it completely, including reviews and runbooks:
-
-- **Platform engineer** — owns the GitOps layer and cluster-level components: Flux, operators, monitoring, ingress. Responsible for making it safe and easy for application teams to deploy.
-- **Infrastructure engineer** — owns Terraform and Ansible: provisioning, networking, IAM, the bootstrap pipeline, and CI/CD workflows.
-- **Reliability engineer** — owns backup/restore procedures, alerting, runbooks, and incident response. Embedded in the team but with a dedicated focus on production readiness and operational safety.
-
-On a 3-person team these roles overlap heavily. The distinction is about primary ownership and review authority, not hard siloing.
-
-### 🔍 Review Process
-
-- All changes go through PRs — no direct commits to `main`
-- Infrastructure changes (`terraform/`, `ansible/`) require review from the infrastructure engineer plus one other
-- GitOps changes (`gitops/`) require review from the platform engineer
-- CI enforces `terraform plan` output on every infrastructure PR so reviewers see the blast radius before approving
-- Runbooks and operational docs follow the same PR process — they are code, not wiki pages
-
-### 🚢 Release Management
-
-There are no manual releases. Merging to `main` is the release act — CI applies infrastructure changes, Flux reconciles application changes.
-
-Environment promotion (dev → prod) is a Git operation: bump the image tag or config value, open a PR, get it reviewed, merge. For higher-risk changes (major version upgrades, Terraform destroy/recreate), require explicit sign-off from a second engineer regardless of role.
+No manual deployments. You merge to main and dev gets updated. You merge to prod and production gets updated. For anything risky — major upgrades, deletions — you need a second person to explicitly approve before it runs.
 
 ---
 
-## 2️⃣ Multi-Environment Deployments
+## 2. Multi-Environment Deployments
 
-**How would you manage customer-specific configurations, infrastructure variations, and upgrades across customers?**
+The actual YAML files live in shared directories with placeholders like `${STORAGE_CLASS}` or `${REGION}` instead of hardcoded values. Each customer gets a small folder in Git that points Flux at those shared directories and supplies the real values. Flux swaps them in at reconcile time. So if you have ten customers for example and you have one copy of the Postgres definition, not ten, then you fix or upgrade it in one place and everyone gets it on their next rollout. The alternative is copying manifests per customer and watching them slowly drift apart as different people make different changes to each copy.
 
-### ⚙️ Customer-specific configuration
+If a customer needs a bigger machine, a different region, or different storage, that's just different inputs to the same Terraform code. We never duplicate the modules themselves.
 
-The architecture already demonstrates the pattern. Manifests in `gitops/clusters/common/`, `gitops/operators/`, and `gitops/applications/` are **shared** — every customer points at the same files. Per-customer values flow through Flux's `postBuild.substituteFrom` from a `cluster-vars` ConfigMap set at bootstrap time. Each customer gets their own `gitops/clusters/<customer>/` directory that supplies their own variable values. No manifest duplication.
-
-For deeper variation (different machine sizes, regions, storage classes), the Terraform module structure handles it: a new `terraform/environments/<customer>/` directory with different input variables, same module logic.
-
-### 🏗️ Infrastructure variations
-
-- **Small differences** → Terraform input variables (region, machine type, node count, CIDR)
-- **Large differences** → new Terraform environment directory with selective module overrides
-- The key discipline: keep module code shared and push all variation into inputs — never fork modules
-
-### ⬆️ Upgrades across customers
-
-Platform upgrades (k3s, Flux, operator versions) flow through a staged rollout: dev first, then prod, then any additional customer environments. The promotion is a Git operation: bump the version in a PR, review the plan output, merge, wait for smoke tests, then promote to the next environment.
-
-For zero-downtime Postgres upgrades: bump `imageName` in the Cluster CR → Flux reconciles → CloudNativePG does a rolling restart with replicas first, then primary failover. No manual intervention needed.
+For upgrades, you roll them out gradually. Dev first, check it works, then prod, then any other customer environments. Each step is just a PR with the new version number.
 
 ---
 
-## 3️⃣ Reliability
+## 3. Reliability
 
-**How would you ensure repeatable deployments, automated testing, and safe infrastructure changes?**
+Everything lives in Git. Nothing is configured by hand on a server somewhere. If you deleted the whole cluster right now you could rebuild it from scratch without calling anyone — just re-run Terraform and Ansible.
 
-### 🔁 Repeatable deployments
+Before anything merges, CI checks it: secret scanning, YAML validation, Terraform plan, Ansible lint, manifest validation. After a deploy, a smoke test checks that the nodes are up, Flux has reconciled, Postgres is running, and the app is reachable.
 
-- Everything is declared in Git. There is no configuration that exists only in a running system.
-- All passwords and secrets are treated as infrastructure: generated by Terraform at provisioning time, stored in Secret Manager, pulled into the cluster by ESO. No manual secret entry; no secrets in Git.
-- Ansible is idempotent — safe to re-run. The bootstrap playbook converges to the desired state regardless of the starting point.
-- Flux continuously reconciles. Drift between Git and the cluster is corrected automatically within 60 seconds.
-
-### 🧪 Automated testing
-
-| Stage | What runs | What it catches |
-|---|---|---|
-| PR gate | gitleaks, yamllint, markdownlint | Secrets, malformed YAML, broken docs |
-| PR gate | `terraform fmt`, `terraform validate`, `terraform plan` | Invalid HCL, unintended infra changes |
-| PR gate | `ansible-lint`, `kubeconform` | Ansible quality issues, invalid manifests |
-| Post-deploy | Smoke test (SSH → kubectl) | Nodes Ready, Flux reconciled, Postgres healthy, Adminer up |
-
-For production: add integration tests that exercise the Postgres connection (write a row, read it back) and alert on replication lag.
-
-### 🛡️ Safe infrastructure changes
-
-- `terraform plan` output is visible in every PR — reviewers see exactly what will change before approving
-- The validate/deploy split ensures `terraform apply` only runs after human review
-- For high-risk changes, configure GitHub Environment protection rules to require explicit approval before the deploy workflow proceeds
-- The GCS backend provides state locking — concurrent applies are prevented
+You always see what Terraform is going to do before it does it. Apply only runs after someone has reviewed and approved. State locking means two people can't apply at the same time.
 
 ---
 
-## 4️⃣ Security
+## 4. Security
 
-**How would you ensure network security, data security, runtime security, secrets management, access management, and supply chain security?**
+**Network:** Restrict the Kubernetes API to known IPs. SSH is always a weak spot in CI/CD setups because runners often have dynamic IPs — key-only auth and a brute-force protection tool are the minimum. In production you'd avoid exposing SSH at all and use a tunneling solution instead.
 
-### 🌐 Network security
+**Data:** Use whatever encryption at rest the platform provides by default and make sure backup storage inherits the same. Passwords should never be typed by hand or stored anywhere a human can read them.
 
-- GCE VPC firewall restricts access by port and source: the Kubernetes API (6443) is restricted to the operator's CIDR; SSH is open to `0.0.0.0/0` because GitHub Actions runners have dynamic IPs — key-based auth and fail2ban are the real protection layer
-- ingress-nginx is the only external entry point for application traffic (ports 80/443)
-- Intra-cluster traffic uses Flannel CNI; NetworkPolicies can be layered on top for namespace isolation
+**Runtime:** Lock down the OS on first boot — disable root login, password auth, set up a host firewall. Use Kubernetes Pod Security policies to restrict what containers can do. In production, pin images to a digest so you know exactly what's running.
 
-> 🏭 For production, replace the open SSH rule with **GCP Cloud IAP tunneling** — nodes never need a public SSH port at all.
+**Secrets:** Nothing sensitive in Git, ever — run secret scanning on every PR. Secrets should flow automatically: generated at provisioning time, stored in a secrets manager, pulled into the cluster by an operator, consumed by pods by name. No human in the loop.
 
-### 🔒 Data security
+**Access:** CI should authenticate to cloud providers without stored credentials — use short-lived tokens or federated identity. Scope secrets and permissions per environment so lower environments can't touch production.
 
-- All data at rest on GCE VMs uses Google-managed encryption by default; GCS backup buckets inherit the same
-- Postgres credentials are auto-generated, never seen by a human, stored in Secret Manager, and materialised as Kubernetes Secrets by ESO — they never appear in a CI log or a Git commit
-- TLS for Postgres client connections is enforced by CloudNativePG by default
+**Supply chain:** Pin third-party dependencies — Actions, collections, container images — to specific versions. In production, mirror images to a private registry and scan them before use.
 
-### 🏃 Runtime security
+For example, in GCP we would:
 
-- OS hardening via Ansible: SSH root login disabled, password auth disabled, fail2ban, UFW allowlist
-- k3s runs with the default Pod Security Admission controller; for production, apply stricter PodSecurity standards per namespace
-- Container images should be pinned to digest (not just tag) and scanned in CI — the validate pipeline is the right place to add this
-
-### 🔑 Secrets management
-
-- **No secrets in Git — ever.** gitleaks runs on every PR to enforce this.
-- All credentials flow: Terraform generates → Secret Manager stores → ESO pulls → Kubernetes Secret materialises → workload references by name
-- The SSH private key is set in GitHub secrets via `gh secret set` in the bootstrap script — it never passes through Terraform state
-
-### 👤 Access management
-
-- CI authenticates to GCP via Workload Identity Federation — no long-lived service account keys anywhere
-- GitHub Actions secrets are scoped to the `dev` Environment — access to production secrets requires explicit environment configuration
-- Principle of least privilege: the CI service account has only the permissions it needs (Compute, Storage, Secret Manager, IAM for WIF)
-
-### 📦 Supply chain security
-
-- GitHub Actions workflows pin third-party actions to a specific version tag (e.g. `actions/checkout@v4`); for stronger guarantees, pin to commit SHA
-- Ansible Galaxy collections are pinned to minimum versions in `requirements.yml`
-- Container images use official upstream sources (CloudNativePG, Adminer); in production, mirror to a private registry with digest pinning and vulnerability scanning
+- Restrict the Kubernetes API (6443) to the operator's CIDR via VPC firewall; replace SSH with Cloud IAP tunneling in production
+- Rely on Google-managed encryption at rest for GCE disks and GCS buckets; store all passwords in Secret Manager and pull them with External Secrets Operator
+- Harden nodes via Ansible and use Pod Security Admission; in production tighten policies per namespace
+- Run secret scanning on every PR with gitleaks; secrets flow from Terraform → Secret Manager → ESO → Kubernetes Secret
+- Authenticate CI to GCP via Workload Identity Federation — no keys stored anywhere; scope GitHub secrets per environment
+- Pin GitHub Actions to version tags; pin Ansible Galaxy collections in requirements.yml; in production mirror images to Artifact Registry with scanning
