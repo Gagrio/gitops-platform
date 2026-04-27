@@ -41,6 +41,7 @@ locals {
   ci_sa_roles = [
     "roles/compute.admin",               # VMs, networks, firewall rules
     "roles/iam.serviceAccountAdmin",     # node service account management
+    "roles/iam.serviceAccountUser",      # attach service accounts to GCE VMs
     "roles/iam.workloadIdentityPoolAdmin", # WIF pool and provider management
     "roles/secretmanager.admin",         # Secret Manager secrets
     "roles/storage.admin",               # GCS buckets
