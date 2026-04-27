@@ -27,11 +27,18 @@
         src: /var/lib/rancher/k3s/server/node-token
       register: node_token_raw
 
+    - name: Get internal IP from GCE metadata server
+      ansible.builtin.uri:
+        url: http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/ip
+        headers:
+          Metadata-Flavor: Google
+        return_content: true
+      register: gce_internal_ip
+
     - name: Share token and internal control plane URL with all hosts
       ansible.builtin.set_fact:
         k3s_token: "{{ node_token_raw.content | b64decode | trim }}"
-        # Use the internal IP (10.x.x.x) — external IP would break intra-cluster communication
-        k3s_url: "https://{{ ansible_all_ipv4_addresses | select('match', '^10\\.') | first }}:6443"
+        k3s_url: "https://{{ gce_internal_ip.content }}:6443"
       delegate_to: "{{ item }}"
       delegate_facts: true
       loop: "{{ groups['k3s_cluster'] }}"
