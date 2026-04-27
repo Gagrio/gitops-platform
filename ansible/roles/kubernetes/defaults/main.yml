@@ -1,5 +1,6 @@
 ---
 k3s_role: worker   # overridden per play: control or worker
+k3s_version: "v1.32.0+k3s1"
 k3s_install_url: "https://get.k3s.io"
 
 # Control plane flags — no Traefik (we use ingress-nginx via Flux), no local-path (we use CNPG for storage)
