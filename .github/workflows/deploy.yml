@@ -94,6 +94,30 @@ jobs:
             timeout 120 bash -c "until ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci ubuntu@$ip 'echo ok' 2>/dev/null; do sleep 5; done"
           done
 
+      - name: Generate inventory from GCP
+        run: |
+          CONTROL=$(gcloud compute instances list \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --filter="labels.environment=${{ env.ENVIRONMENT }} AND labels.role=control" \
+            --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
+          WORKERS=$(gcloud compute instances list \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --filter="labels.environment=${{ env.ENVIRONMENT }} AND labels.role=worker" \
+            --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
+          cat > /tmp/hosts.ini << EOF
+          [control]
+          $CONTROL
+
+          [worker]
+          $WORKERS
+
+          [k3s_cluster:children]
+          control
+          worker
+          EOF
+          echo "Generated inventory:"
+          cat /tmp/hosts.ini
+
       - name: Run bootstrap playbook
         working-directory: ansible
         env:
@@ -101,6 +125,7 @@ jobs:
           STORAGE_CLASS: ${{ env.ENVIRONMENT == 'prod' && 'standard' || 'local-path' }}
         run: |
           ansible-playbook playbooks/bootstrap.yml \
+            -i /tmp/hosts.ini \
             --extra-vars "gcp_project_id=${{ secrets.GCP_PROJECT_ID }} \
                           region=${{ secrets.GCP_REGION }} \
                           environment=${{ env.ENVIRONMENT }} \
