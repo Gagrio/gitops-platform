@@ -172,7 +172,7 @@ dev-node-03   Ready    <none>                 4m    v1.32.0+k3s1
 flux get kustomizations -A --watch
 ```
 
-Wait until all kustomizations show `True` in the Ready column. `common` (which deploys ingress-nginx, ESO, and kube-prometheus-stack) takes up to 15 minutes on first install. If a kustomization stays in a failed state:
+Wait until all kustomizations show `True` in the Ready column. The order is: `common` (HelmReleases) → `eso-config` (secrets) → `postgres` and `monitoring` in parallel → `demo-app`. `common` typically takes 5–10 minutes on first install; `monitoring` (kube-prometheus-stack) can take up to 15 minutes but runs in parallel and doesn't block the application. If a kustomization stays in a failed state:
 
 ```bash
 flux logs --kind=Kustomization --name=<name> -n flux-system
@@ -270,8 +270,10 @@ The bootstrap state lives in the same GCS bucket under the `bootstrap` prefix an
 | CI fails with WIF authentication error | WIF provider not configured | Re-run bootstrap `terraform apply` |
 | CI fails at `ansible-playbook` | SSH key mismatch | Confirm `SSH_PRIVATE_KEY` secret matches `~/.ssh/enclaive-ci` |
 | Node not `Ready` | k3s failed to start | SSH into node: `sudo systemctl status k3s` or `sudo systemctl status k3s-agent` |
-| `common` kustomization stuck | kube-prometheus-stack slow on first install | Normal — it can take up to 15 min. Check: `flux logs --kind=Kustomization --name=common -n flux-system` |
-| `postgres` or `demo-app` kustomization stuck | Depends on `common` — wait for it first | Check status with `flux get kustomizations -A` |
+| `common` kustomization stuck | HelmRelease install slow on first run | Check: `flux logs --kind=Kustomization --name=common -n flux-system` and `kubectl get helmrelease -A` |
+| `eso-config` kustomization stuck | ESO not yet running or CRD missing | Wait for `common` first; check ESO pod: `kubectl get pods -n external-secrets` |
+| `postgres` kustomization stuck | Depends on `eso-config` — wait for it | Check: `flux logs --kind=Kustomization --name=postgres -n flux-system` |
+| `monitoring` kustomization slow | kube-prometheus-stack can take 15 min | Normal — it runs in parallel and doesn't block the app. Check: `kubectl get helmrelease -n monitoring` |
 | Adminer not reachable in browser | ingress-nginx pod not on that node | Try a different node IP; check which nodes have the pod: `kubectl get pod -n ingress-nginx -o wide` |
 | kubectl connection refused or times out | API server port (6443) firewalled | Confirm your current IP matches `ADMIN_CIDR` used during bootstrap |
 | kubeconfig artifact empty | scp step failed | SSH to control plane manually: `scp ubuntu@<cp-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/config-enclaive-dev` |

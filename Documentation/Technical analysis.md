@@ -91,15 +91,17 @@ The challenge lists ArgoCD as the preferred option. We chose Flux because it int
 
 The `gitops/` directory is the root of everything Flux manages. It's structured by environment (`clusters/dev`, `clusters/prod`) and by concern:
 
-- 🛠️ `clusters/common/` — shared cluster platform components: ingress-nginx, External Secrets Operator, kube-prometheus-stack
-- 🐘 `operators/postgres/` — the CloudNativePG `Cluster` CR and related backup/monitoring configuration
+- 🛠️ `clusters/common/` — shared HelmReleases with no CRD dependencies: ingress-nginx, External Secrets Operator (ESO), CloudNativePG operator
+- 🔑 `operators/eso-config/` — ESO CRs applied after ESO is installed: ClusterSecretStore (GCP Secret Manager) and all ExternalSecrets (Grafana + Postgres passwords)
+- 📊 `operators/monitoring/` — kube-prometheus-stack, applied after eso-config so the Grafana password Secret exists before Helm installs it
+- 🐘 `operators/postgres/` — the CloudNativePG `Cluster` CR, backup schedule, and network policies (credentials already created by eso-config)
 - 🖥️ `applications/demo-app/` — the Adminer deployment, service, and ingress
 
-Flux processes these in dependency order: common must be healthy before operators are applied, operators before applications.
+Flux processes these in dependency order. The layering exists to solve a CRD timing problem: Flux dry-runs all resources before applying any. If a CRD doesn't exist (because its operator hasn't installed yet), the dry-run fails for the whole kustomization — a chicken-and-egg loop. Separating HelmReleases from CRs and chaining them with `dependsOn` breaks the loop.
 
 ### 🌍 Per-environment configuration
 
-The manifests in `clusters/common/`, `operators/`, and `applications/` are **shared** — both dev and prod point at the same files, no duplication. Environment-specific values flow through two ConfigMaps created by Ansible during bootstrap:
+The manifests in `clusters/common/`, `operators/`, and `applications/` are **shared** — both dev and prod point at the same files, no duplication. Only the per-environment Flux Kustomization entry points (`clusters/dev/`, `clusters/prod/`) differ. Environment-specific values flow through two ConfigMaps created by Ansible during bootstrap:
 
 - `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this single-project setup)
 - `cluster-vars` — `ENVIRONMENT`, `REGION`, and `STORAGE_CLASS` (per-environment; REGION can differ if dev and prod run in different GCP regions; STORAGE_CLASS differs for storage durability — see Architecture doc)
@@ -174,10 +176,14 @@ CloudNativePG exposes PostgreSQL metrics natively via a `PodMonitor` CR that tel
       │  roles/flux        → Flux install, GitRepository CR, Kustomization CR
       ▼
   Flux reconciles clusters/common/
-      │  installs: ingress-nginx, External Secrets Operator, Prometheus stack
+      │  installs: ingress-nginx, ESO, CNPG operator (HelmReleases only)
       ▼
-  Flux reconciles operators/postgres/
-      │  creates: Cluster CR, ExternalSecrets, PodMonitor CR
+  Flux reconciles operators/eso-config/
+      │  creates: ClusterSecretStore, all ExternalSecrets (CRDs now exist)
+      ▼
+  Flux reconciles operators/postgres/ and operators/monitoring/ in parallel
+      │  postgres:    Cluster CR, backup schedule, network policies
+      │  monitoring:  kube-prometheus-stack (grafana secret now exists)
       ▼
   CloudNativePG operator
       │  provisions: pg-1 (primary), pg-2 (replica), pg-3 (replica)
@@ -227,15 +233,16 @@ Three workflows cover the full repository. Flux handles everything after the dep
       │
       └── Job 3: smoke test (SSH into control plane)
                 kubectl wait nodes Ready
-                kubectl wait kustomizations Ready (up to 10 min)
-                kubectl wait cluster/pg Ready
-                kubectl wait pods -n postgres Ready
-                kubectl wait pods -n demo-app Ready
+                kubectl wait kustomization/common Ready (≤10 min)
+                kubectl wait kustomization/eso-config Ready (≤2 min)
+                kubectl wait kustomization/postgres Ready (≤10 min)
+                kubectl wait kustomization/demo-app Ready (≤5 min)
+                curl http://<ingress-node>/adminer → HTTP 200
 
   CI is done. Flux takes over. 🔄
       │
       └── Flux reconciles gitops/ continuously (60s loop)
-              clusters/common/ → operators/postgres/ → applications/demo-app/
+              common → eso-config → postgres/monitoring → demo-app
 ```
 
 ### ❌ What CI does NOT do
