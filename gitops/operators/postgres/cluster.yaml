@@ -53,8 +53,9 @@ spec:
     barmanObjectStore:
       destinationPath: "gs://${ENVIRONMENT}-${GCP_PROJECT_ID}-pg-backups"
       googleCredentials:
-        # Uses the GCE instance metadata server (node SA has storage.objectAdmin on the bucket)
-        gkeEnvironment: false
+        # true = use GCE metadata server for credentials (node SA has storage.objectAdmin).
+        # Despite the name this is not GKE-specific — it works on any GCE VM.
+        gkeEnvironment: true
       wal:
         compression: gzip
         maxParallel: 2
