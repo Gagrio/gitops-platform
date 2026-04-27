@@ -59,6 +59,9 @@ jobs:
     name: Ansible Bootstrap
     runs-on: ubuntu-latest
     needs: terraform-apply
+    permissions:
+      contents: write   # Flux bootstrap pushes flux-system manifests to the repo
+      id-token: write   # required for Workload Identity Federation
     environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
@@ -121,6 +124,7 @@ jobs:
       - name: Run bootstrap playbook
         working-directory: ansible
         env:
+          PYTHONUNBUFFERED: "1"
           # dev uses local node disk (fast, no extra cost); prod uses GCE PD (durable, survives node deletion)
           STORAGE_CLASS: ${{ env.ENVIRONMENT == 'prod' && 'standard' || 'local-path' }}
         run: |
