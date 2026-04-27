@@ -98,9 +98,7 @@
       STORAGE_CLASS: "{{ storage_class }}"
     EOF
 
-- name: Copy kubeconfig for CI artifact upload
-  ansible.builtin.copy:
-    src: "{{ kubeconfig_path }}"
-    dest: "{{ kubeconfig_artifact_path }}"
-    remote_src: true
-    mode: "0600"
+- name: Ensure kubeconfig is world-readable for scp fetch
+  ansible.builtin.file:
+    path: "{{ kubeconfig_path }}"
+    mode: "0644"

@@ -32,6 +32,4 @@
   become: true
   roles:
     - flux
-# trigger
-
 

@@ -18,6 +18,11 @@ spec:
   values:
     controller:
       replicaCount: 2
+      # hostPort binds the controller pods directly to ports 80/443 on the node.
+      # Required because ServiceLB is disabled in k3s and no cloud LB is provisioned.
+      # The GCP firewall allows 80/443 from 0.0.0.0/0 so any node IP works.
+      hostPort:
+        enabled: true
       service:
         type: LoadBalancer
       metrics:

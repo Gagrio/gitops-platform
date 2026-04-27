@@ -12,6 +12,8 @@ on:
     paths:
       - "terraform/**"
       - "ansible/**"
+      - "gitops/**"
+      - ".github/workflows/**"
 
 permissions:
   contents: read
@@ -134,9 +136,22 @@ jobs:
                           region=${{ secrets.GCP_REGION }} \
                           cluster_env=${{ env.ENVIRONMENT }} \
                           gitops_branch=${{ github.ref_name }} \
+                          github_owner=${{ github.repository_owner }} \
                           subnet_cidr=${{ secrets.SUBNET_CIDR }} \
                           storage_class=${{ env.STORAGE_CLASS }} \
                           github_token=${{ secrets.GITHUB_TOKEN }}"
+
+      - name: Fetch kubeconfig from control plane and patch server address
+        run: |
+          CP_IP=$(gcloud compute instances list \
+            --project=${{ secrets.GCP_PROJECT_ID }} \
+            --filter="labels.environment=${{ env.ENVIRONMENT }} AND labels.role=control" \
+            --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
+            ubuntu@${CP_IP}:/etc/rancher/k3s/k3s.yaml \
+            /tmp/kubeconfig-enclaive-${{ env.ENVIRONMENT }}
+          sed -i "s|https://127.0.0.1:6443|https://${CP_IP}:6443|" \
+            /tmp/kubeconfig-enclaive-${{ env.ENVIRONMENT }}
 
       - name: Upload kubeconfig artifact
         uses: actions/upload-artifact@v4
