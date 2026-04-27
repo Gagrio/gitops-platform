@@ -1,0 +1,24 @@
+---
+# Flux Kustomization — ClusterSecretStore + all ExternalSecrets.
+# Depends on common so ESO CRDs exist before these resources are applied.
+apiVersion: kustomize.toolkit.fluxcd.io/v1
+kind: Kustomization
+metadata:
+  name: eso-config
+  namespace: flux-system
+spec:
+  interval: 10m
+  path: ./gitops/operators/eso-config
+  prune: true
+  sourceRef:
+    kind: GitRepository
+    name: flux-system
+  dependsOn:
+    - name: common
+  timeout: 5m
+  postBuild:
+    substituteFrom:
+      - kind: ConfigMap
+        name: cluster-global
+      - kind: ConfigMap
+        name: cluster-vars
