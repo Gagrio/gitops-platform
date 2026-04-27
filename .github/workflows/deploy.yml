@@ -128,7 +128,7 @@ jobs:
             -i /tmp/hosts.ini \
             --extra-vars "gcp_project_id=${{ secrets.GCP_PROJECT_ID }} \
                           region=${{ secrets.GCP_REGION }} \
-                          environment=${{ env.ENVIRONMENT }} \
+                          cluster_env=${{ env.ENVIRONMENT }} \
                           gitops_branch=${{ github.ref_name }} \
                           subnet_cidr=${{ secrets.SUBNET_CIDR }} \
                           storage_class=${{ env.STORAGE_CLASS }} \

@@ -93,7 +93,7 @@
       name: cluster-vars
       namespace: {{ flux_namespace }}
     data:
-      ENVIRONMENT: "{{ environment }}"
+      ENVIRONMENT: "{{ cluster_env }}"
       REGION: "{{ region }}"
       STORAGE_CLASS: "{{ storage_class }}"
     EOF

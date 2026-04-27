@@ -7,13 +7,13 @@ kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 
 # Injected by CI via --extra-vars
 gcp_project_id: ""
-environment: dev
+cluster_env: dev
 # Injected by CI: main for dev cluster, prod for prod cluster
 gitops_branch: main
 # Each environment has its own Flux entry point in the gitops/ tree
-gitops_path: "gitops/clusters/{{ environment }}"
+gitops_path: "gitops/clusters/{{ cluster_env }}"
 # Kubeconfig artifact path includes environment name for clarity
-kubeconfig_artifact_path: "/tmp/kubeconfig-enclaive-{{ environment }}"
+kubeconfig_artifact_path: "/tmp/kubeconfig-enclaive-{{ cluster_env }}"
 
 # Region defaults to europe-west1; can be overridden per environment via --extra-vars
 # if dev and prod need to run in different regions
