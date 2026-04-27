@@ -28,4 +28,7 @@ spec:
       metrics:
         enabled: true
         serviceMonitor:
-          enabled: true
+          # ServiceMonitor CRD comes from kube-prometheus-stack (monitoring kustomization).
+          # Disabled here to avoid a CRD ordering failure; Prometheus scrapes via
+          # additionalServiceMonitors in the kube-prometheus-stack HelmRelease instead.
+          enabled: false
