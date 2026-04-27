@@ -203,9 +203,14 @@ jobs:
             timeout 120 bash -c \
               'until sudo k3s kubectl get kustomization common -n flux-system &>/dev/null; do sleep 5; done'
 
-            echo "=== Flux kustomizations Ready ==="
-            $K wait kustomization/common kustomization/postgres kustomization/demo-app \
-              -n flux-system --for=condition=Ready --timeout=600s
+            echo "=== common kustomization Ready (ingress-nginx + ESO + kube-prometheus-stack) ==="
+            $K wait kustomization/common -n flux-system --for=condition=Ready --timeout=900s
+
+            echo "=== postgres kustomization Ready ==="
+            $K wait kustomization/postgres -n flux-system --for=condition=Ready --timeout=600s
+
+            echo "=== demo-app kustomization Ready ==="
+            $K wait kustomization/demo-app -n flux-system --for=condition=Ready --timeout=300s
 
             echo "=== Waiting for Postgres Cluster CR ==="
             timeout 60 bash -c \
@@ -219,6 +224,18 @@ jobs:
             echo "=== Adminer pod ==="
             $K wait pods -n demo-app -l app=adminer \
               --for=condition=Ready --timeout=120s
+
+            echo "=== Adminer reachable via ingress ==="
+            INGRESS_IP=$($K get pod -n ingress-nginx \
+              -l app.kubernetes.io/name=ingress-nginx \
+              -o jsonpath='{.items[0].status.hostIP}')
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 \
+              http://${INGRESS_IP}/adminer)
+            if [[ "$STATUS" != "200" ]]; then
+              echo "Adminer returned HTTP $STATUS — expected 200"
+              exit 1
+            fi
+            echo "Adminer reachable: HTTP $STATUS"
 
             echo ""
             echo "✅ All smoke tests passed!"
