@@ -139,7 +139,7 @@ jobs:
                           github_owner=${{ github.repository_owner }} \
                           subnet_cidr=${{ secrets.SUBNET_CIDR }} \
                           storage_class=${{ env.STORAGE_CLASS }} \
-                          github_token=${{ secrets.GITHUB_TOKEN }}"
+                          github_token=${{ secrets.FLUX_GITHUB_TOKEN }}"
 
       - name: Fetch kubeconfig from control plane and patch server address
         run: |
