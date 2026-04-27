@@ -99,7 +99,7 @@ Bump the `imageName` in the `Cluster` CR and merge. CloudNativePG performs a **r
 
 ### ☸️ k3s Upgrade
 
-Bump `k3s_version` in `ansible/inventory/group_vars/all.yml` and merge. CI runs the bootstrap playbook, which re-runs the k3s installer on all nodes. The installer detects the version mismatch and upgrades in place.
+Bump `k3s_version` in `ansible/inventory/group_vars/all.yml` and merge. CI runs the bootstrap playbook, which re-runs the k3s installer on all nodes. Ansible checks the running k3s version first and only runs the installer if the version doesn't match — so the upgrade is triggered automatically.
 
 > ⚠️ **Limitation:** The bootstrap playbook upgrades all nodes without draining workloads first. Pods running on a node being upgraded may be interrupted. This is acceptable for dev but not for production workloads that require zero downtime.
 

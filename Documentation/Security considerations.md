@@ -118,26 +118,14 @@ k3s uses **Flannel** as its CNI. Flannel provides overlay networking so pods can
 
 ### ⚙️ Kubernetes NetworkPolicies
 
-No NetworkPolicies are currently defined. This is acceptable for a demo platform. For production, the recommended baseline:
+A NetworkPolicy is defined for the Postgres namespace (`gitops/operators/postgres/network-policies.yaml`). It denies all ingress to Postgres pods except port 5432 from the `demo-app` namespace.
 
-```yaml
-# Default-deny all ingress and egress within each namespace
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
-metadata:
-  name: default-deny-all
-spec:
-  podSelector: {}
-  policyTypes:
-    - Ingress
-    - Egress
-```
+> ⚠️ Flannel does not enforce NetworkPolicies natively — the policy is declared but not enforced in the current setup. To enforce it, install a NetworkPolicy-capable CNI alongside Flannel (e.g. Calico in policy-only mode) or switch to a CNI that supports them natively (e.g. Cilium). In k3s, this requires replacing Flannel entirely.
 
-Then add explicit allow rules for:
-- Postgres replicas ↔ primary (streaming replication, port 5432)
-- ESO → Secret Manager (egress to Google APIs)
-- Prometheus → PodMonitor targets (scrape port 9187)
-- ingress-nginx → application pods (port 8080)
-- DNS resolution (egress to kube-dns, port 53)
-
-> ⚠️ Flannel does not enforce NetworkPolicies natively. To enforce them, install a NetworkPolicy-capable CNI alongside Flannel (e.g. Calico in policy-only mode) or switch to a CNI that supports them natively (e.g. Cilium). In k3s, this requires replacing Flannel entirely.
+For production, the recommended baseline on top of the existing policy:
+- Default-deny all ingress and egress within each namespace
+- Explicit allow: Postgres replicas ↔ primary (streaming replication, port 5432)
+- Explicit allow: ESO → Secret Manager (egress to Google APIs)
+- Explicit allow: Prometheus → PodMonitor targets (scrape port 9187)
+- Explicit allow: ingress-nginx → application pods
+- Explicit allow: DNS resolution (egress to kube-dns, port 53)
