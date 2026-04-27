@@ -31,17 +31,3 @@ resource "google_project_iam_member" "metric_writer" {
   member  = "serviceAccount:${google_service_account.nodes.email}"
 }
 
-# Workload Identity pool — links GCP SA to the Kubernetes cluster's identity namespace
-resource "google_service_account_iam_member" "workload_identity_eso" {
-  service_account_id = google_service_account.nodes.name
-  role               = "roles/iam.workloadIdentityUser"
-  # Allows the External Secrets Operator k8s SA to impersonate this GCP SA
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[external-secrets/external-secrets]"
-}
-
-resource "google_service_account_iam_member" "workload_identity_cnpg" {
-  service_account_id = google_service_account.nodes.name
-  role               = "roles/iam.workloadIdentityUser"
-  # Allows the CloudNativePG backup SA to impersonate this GCP SA for GCS writes
-  member             = "serviceAccount:${var.project_id}.svc.id.goog[postgres/postgres-backup]"
-}

@@ -22,7 +22,7 @@ resource "google_compute_instance" "node" {
   boot_disk {
     initialize_params {
       # Ubuntu 24.04 LTS — current LTS, supported by k3s and all Ansible roles
-      image = "ubuntu-os-cloud/ubuntu-2404-lts"
+      image = "ubuntu-os-cloud/ubuntu-2404-lts-amd64"
       size  = 50
       type  = "pd-balanced"
     }
