@@ -33,6 +33,7 @@
         # Use the internal IP (10.x.x.x) — external IP would break intra-cluster communication
         k3s_url: "https://{{ ansible_all_ipv4_addresses | select('match', '^10\\.') | first }}:6443"
       delegate_to: "{{ item }}"
+      delegate_facts: true
       loop: "{{ groups['k3s_cluster'] }}"
 
     - name: Ensure k3s is enabled and started
