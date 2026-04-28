@@ -221,7 +221,7 @@ jobs:
             $K wait cluster/pg -n postgres --for=condition=Ready --timeout=900s
 
             echo "=== Postgres pods ==="
-            $K wait pods -n postgres -l cnpg.io/cluster=pg \
+            $K wait pod/pg-1 pod/pg-2 pod/pg-3 -n postgres \
               --for=condition=Ready --timeout=120s
 
             echo "=== Adminer pod ==="
