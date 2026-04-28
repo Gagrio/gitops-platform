@@ -196,6 +196,28 @@ jobs:
             set -e
             K="sudo k3s kubectl"
 
+            # Dump Flux kustomization status, pod events, and recent logs on any failure.
+            # Runs automatically via EXIT trap so failed runs are self-diagnosing.
+            dump_diagnostics() {
+              echo ""
+              echo "===== DIAGNOSTICS ====="
+              echo "--- Flux kustomizations ---"
+              sudo k3s kubectl get kustomization -A 2>/dev/null || true
+              echo "--- HelmReleases ---"
+              sudo k3s kubectl get helmrelease -A 2>/dev/null || true
+              echo "--- ExternalSecrets ---"
+              sudo k3s kubectl get externalsecret -A 2>/dev/null || true
+              echo "--- Postgres cluster ---"
+              sudo k3s kubectl get cluster -n postgres 2>/dev/null || true
+              echo "--- Pods (all namespaces) ---"
+              sudo k3s kubectl get pods -A 2>/dev/null || true
+              echo "--- Recent Flux logs ---"
+              sudo k3s kubectl logs -n flux-system \
+                deployment/kustomize-controller --tail=30 2>/dev/null || true
+              echo "===== END DIAGNOSTICS ====="
+            }
+            trap 'EC=$?; [[ $EC -ne 0 ]] && dump_diagnostics' EXIT
+
             echo "=== Nodes ==="
             $K wait node --all --for=condition=Ready --timeout=120s
 
@@ -209,15 +231,20 @@ jobs:
             echo "=== eso-config kustomization Ready (ClusterSecretStore + ExternalSecrets) ==="
             $K wait kustomization/eso-config -n flux-system --for=condition=Ready --timeout=120s
 
+            echo "=== ExternalSecrets synced ==="
+            for secret in grafana-admin-password pg-superuser-password pg-app-password pg-replication-password; do
+              ns=$( [[ "$secret" == "grafana-admin-password" ]] && echo monitoring || echo postgres )
+              $K wait externalsecret/$secret -n $ns \
+                --for=condition=Ready --timeout=60s
+            done
+
             echo "=== postgres kustomization Ready ==="
             $K wait kustomization/postgres -n flux-system --for=condition=Ready --timeout=600s
 
             echo "=== demo-app kustomization Ready ==="
             $K wait kustomization/demo-app -n flux-system --for=condition=Ready --timeout=300s
 
-            echo "=== Waiting for Postgres Cluster CR ==="
-            timeout 60 bash -c \
-              'until sudo k3s kubectl get cluster pg -n postgres &>/dev/null; do sleep 5; done'
+            echo "=== Postgres cluster healthy ==="
             $K wait cluster/pg -n postgres --for=condition=Ready --timeout=900s
 
             echo "=== Postgres pods ==="
