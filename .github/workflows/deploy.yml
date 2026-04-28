@@ -5,6 +5,16 @@
 name: Deploy
 
 on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: "Environment to deploy"
+        required: true
+        default: dev
+        type: choice
+        options:
+          - dev
+          - prod
   push:
     branches:
       - main   # deploys to dev
@@ -28,9 +38,11 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       subnet_cidr: ${{ steps.tf-outputs.outputs.subnet_cidr }}
-    environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+    environment: >-
+      ${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+      ENVIRONMENT: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref_name == 'main' && 'dev' || github.ref_name }}
       TF_VAR_project_id: ${{ secrets.GCP_PROJECT_ID }}
       TF_VAR_region: ${{ secrets.GCP_REGION }}
       TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
@@ -72,9 +84,11 @@ jobs:
     permissions:
       contents: write   # Flux bootstrap pushes flux-system manifests to the repo
       id-token: write
-    environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+    environment: >-
+      ${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
-      ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+      ENVIRONMENT: >-
+        ${{ github.event_name == 'workflow_dispatch' && inputs.environment || github.ref_name == 'main' && 'dev' || github.ref_name }}
       GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
     steps:
       - uses: actions/checkout@v4

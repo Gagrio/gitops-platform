@@ -144,12 +144,12 @@ The Ansible playbook fetches the kubeconfig from the control plane and uploads i
 1. Go to your repository on GitHub → **Actions**
 2. Click the completed deploy run
 3. Scroll to **Artifacts** at the bottom of the run page
-4. Download `kubeconfig-enclaive-dev` and save it to `~/.kube/config-enclaive-dev`
+4. Download `kubeconfig-enclaive-<environment>` and save it to `~/.kube/config-enclaive-<environment>`
 
 Then point kubectl at it:
 
 ```bash
-export KUBECONFIG=~/.kube/config-enclaive-dev
+export KUBECONFIG=~/.kube/config-enclaive-<environment>
 ```
 
 > The API server (port 6443) is restricted to your `ADMIN_CIDR` by the GCP firewall. If kubectl times out, confirm your current IP matches the CIDR you used during bootstrap.
@@ -162,10 +162,10 @@ kubectl get nodes
 
 Expected output:
 ```
-NAME           STATUS   ROLES                  AGE   VERSION
-dev-node-01   Ready    control-plane,master   5m    v1.32.0+k3s1
-dev-node-02   Ready    <none>                 4m    v1.32.0+k3s1
-dev-node-03   Ready    <none>                 4m    v1.32.0+k3s1
+NAME                STATUS   ROLES                  AGE   VERSION
+<env>-node-01      Ready    control-plane,master   5m    v1.32.0+k3s1
+<env>-node-02      Ready    <none>                 4m    v1.32.0+k3s1
+<env>-node-03      Ready    <none>                 4m    v1.32.0+k3s1
 ```
 
 ### 3.2 🔄 Watch Flux Reconcile
@@ -199,7 +199,7 @@ http://<any-node-external-ip>/grafana
 
 Retrieve the admin password from Secret Manager:
 ```bash
-gcloud secrets versions access latest --secret=dev-grafana-admin-password
+gcloud secrets versions access latest --secret=<environment>-grafana-admin-password
 ```
 Log in as **admin** with that password. Navigate to **Dashboards → CloudNativePG** for PostgreSQL metrics.
 
@@ -215,14 +215,14 @@ Get a node IP with:
 ```bash
 gcloud compute instances list \
   --project=<your-project-id> \
-  --filter="labels.environment=dev" \
+  --filter="labels.environment=<environment>" \
   --format="table(name, networkInterfaces[0].accessConfigs[0].natIP, labels.role)"
 ```
 
 Retrieve the app user password from Secret Manager:
 ```bash
 gcloud secrets versions access latest \
-  --secret=dev-pg-app-password \
+  --secret=<environment>-pg-app-password \
   --project=<your-project-id>
 ```
 
@@ -284,7 +284,7 @@ You should see two rows (one for each replica) with `state = streaming`. This co
 ## 💣 Teardown
 
 ```bash
-cd terraform/environments/dev
+cd terraform/environments/<environment>
 terraform destroy
 ```
 
@@ -315,5 +315,5 @@ The bootstrap state lives in the same GCS bucket under the `bootstrap` prefix an
 | CNPG Cluster CR rejected by webhook | `gkeEnvironment: false` requires an explicit SA key secret | Cluster CR uses `gkeEnvironment: true` — the node SA accesses GCS via the metadata server; no key file needed |
 | Adminer not reachable in browser | ingress-nginx pod not on that node | Try a different node IP; check which nodes have the pod: `kubectl get pod -n ingress-nginx -o wide` |
 | kubectl connection refused or times out | API server port (6443) firewalled | Confirm your current IP matches `ADMIN_CIDR` used during bootstrap |
-| kubeconfig artifact empty | scp step failed | SSH to control plane manually: `scp ubuntu@<cp-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/config-enclaive-dev` |
-| Cannot retrieve app password | Secret Manager access | Run `gcloud secrets versions access latest --secret=dev-pg-app-password` |
+| kubeconfig artifact empty | scp step failed | SSH to control plane manually: `scp ubuntu@<cp-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/config-enclaive-<environment>` |
+| Cannot retrieve app password | Secret Manager access | Run `gcloud secrets versions access latest --secret=<environment>-pg-app-password` |

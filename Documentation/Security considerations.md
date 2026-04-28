@@ -34,9 +34,11 @@ Passwords are treated as infrastructure: generated once at `terraform apply` tim
 
 | Secret | Who creates it | Who reads it |
 |---|---|---|
-| `dev-pg-app-password` | Terraform `random_password` | ESO → CloudNativePG |
-| `dev-pg-superuser-password` | Terraform `random_password` | ESO → CloudNativePG |
-| `dev-grafana-admin-password` | Terraform `random_password` | ESO → Grafana (via `valuesFrom`) |
+| `{env}-pg-app-password` | Terraform `random_password` | ESO → CloudNativePG |
+| `{env}-pg-superuser-password` | Terraform `random_password` | ESO → CloudNativePG |
+| `{env}-grafana-admin-password` | Terraform `random_password` | ESO → Grafana (via `valuesFrom`) |
+
+The `{env}` prefix matches the environment name (`dev` or `prod`). Each environment's Terraform creates its own set of secrets. ESO uses `${ENVIRONMENT}` as a Flux substitution variable to reference the right secret at runtime.
 
 ### 🔍 What gitleaks enforces
 
@@ -44,7 +46,7 @@ The `repo-checks.yml` workflow runs [gitleaks](https://github.com/gitleaks/gitle
 
 ### 🔐 GitHub Actions secrets
 
-CI secrets (GCP project ID, WIF provider, service account, SSH key, state bucket) are stored in GitHub Actions secrets scoped to the `dev` Environment. The SSH private key in particular is set via `gh secret set` in the bootstrap script — it never passes through Terraform state, a file on disk, or a CI log.
+CI secrets (GCP project ID, WIF provider, service account, SSH key, state bucket) are stored in GitHub Actions secrets at the repository level and are shared across environments. The SSH private key in particular is set via `gh secret set` in the bootstrap script — it never passes through Terraform state, a file on disk, or a CI log.
 
 The subnet CIDR is **not** stored as a secret. After `terraform apply` runs, CI reads it back from a Terraform output (`terraform output -raw subnet_cidr`) and passes it directly to Ansible. This keeps the value in one place (Terraform) rather than duplicating it in secrets where it would have to be kept in sync manually.
 
@@ -97,7 +99,7 @@ SSH (port 22) is currently open to `0.0.0.0/0`. This is a deliberate trade-off: 
 
 ### 🌐 GitHub Environment protection
 
-GitHub Actions secrets are scoped to the `dev` Environment. To add a human approval gate before `terraform apply` runs, configure **required reviewers** on the Environment in repository settings. Without this, any merge to `main` triggers an immediate deploy.
+GitHub Actions Environments (`dev` and `prod`) scope deployment jobs to their respective environments. To add a human approval gate before `terraform apply` runs on production, configure **required reviewers** on the `prod` Environment in repository settings. Without this, any push to the `prod` branch triggers an immediate deploy.
 
 ---
 
