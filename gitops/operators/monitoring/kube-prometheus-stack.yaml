@@ -58,16 +58,11 @@ spec:
         resources:
           requests:
             memory: 512Mi
+        # Watch PodMonitors and ServiceMonitors in all namespaces, not just monitoring.
+        # Required so the PodMonitor CNPG creates in the postgres namespace is discovered.
+        podMonitorNamespaceSelector: {}
+        podMonitorSelector: {}
+        serviceMonitorNamespaceSelector: {}
+        serviceMonitorSelector: {}
     alertmanager:
       enabled: false
-    # Scrape CloudNativePG metrics via its ServiceMonitor
-    additionalServiceMonitors:
-      - name: cloudnativepg
-        selector:
-          matchLabels:
-            cnpg.io/cluster: pg
-        namespaceSelector:
-          matchNames:
-            - postgres
-        endpoints:
-          - port: metrics
