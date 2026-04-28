@@ -130,13 +130,7 @@ jobs:
 
       - name: Get all node IPs
         id: all-ips
-        run: |
-          IPS=$(gcloud compute instances list \
-            --project="$GCP_PROJECT" \
-            --filter="labels.environment=${{ env.ENVIRONMENT }}" \
-            --format="value(networkInterfaces[0].accessConfigs[0].natIP)" \
-            | tr '\n' ' ' | xargs)
-          echo "ips=$IPS" >> "$GITHUB_OUTPUT"
+        run: echo "ips=$(bash scripts/ci/get-node-ips.sh)" >> "$GITHUB_OUTPUT"
 
       - name: Run health checks
         run: |
