@@ -149,6 +149,16 @@ Two mechanisms run in parallel:
 
 Database credentials are not stored in Git. The External Secrets Operator pulls them from Google Secret Manager and materialises them as Kubernetes Secrets in the `postgres` namespace. CloudNativePG references these secrets by name — it never sees a plaintext password.
 
+### 🔒 Network Policy
+
+A `NetworkPolicy` restricts ingress to all Postgres pods. Three sources are explicitly allowed:
+
+1. **The `postgres` namespace itself** — on ports 8000 and 5432. The CNPG operator polls each instance's HTTP status endpoint on port 8000 to determine health and decide when to create replicas. Without this, the operator can never confirm pg-1 is healthy and will never provision pg-2 or pg-3, leaving the cluster permanently single-instance. Port 5432 within the namespace allows streaming replication between instances.
+2. **The `demo-app` namespace** — on port 5432. Application connection traffic.
+3. **The `monitoring` namespace** — on port 9187. Prometheus scrapes the CNPG metrics exporter.
+
+All other ingress is denied by default.
+
 ---
 
 ## 🖥️ Step 5 — Demo Application

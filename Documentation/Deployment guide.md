@@ -76,23 +76,7 @@ cd enclaive-platform-challenge
 
 ---
 
-### 1.3 🔑 Create a Long-Lived GitHub Token for Flux
-
-Flux runs inside the cluster and polls the GitHub repository every 60 seconds. It needs a token that stays valid indefinitely — the default `GITHUB_TOKEN` CI provides is ephemeral and expires the moment the workflow run ends, which would cause Flux to lose access to Git as soon as CI finishes.
-
-1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
-2. Create a token with access to this repository and `Contents: Read-only` permission
-3. Store it as a repository secret named **`FLUX_GITHUB_TOKEN`**:
-   ```bash
-   gh secret set FLUX_GITHUB_TOKEN
-   ```
-   Paste the token value when prompted.
-
-> **Why a separate secret?** The CI workflow explicitly passes `FLUX_GITHUB_TOKEN` (not `GITHUB_TOKEN`) to the Ansible `flux` role so Flux's GitRepository CR is configured with a persistent credential. If you only set `GITHUB_TOKEN`, Flux will lose access to the repository the moment CI completes.
-
----
-
-### 1.4 🚀 Run the Bootstrap Script
+### 1.3 🚀 Run the Bootstrap Script
 
 The bootstrap script handles everything else automatically:
 
@@ -106,6 +90,9 @@ What it does:
 3. Writes `terraform/bootstrap/terraform.tfvars` (gitignored)
 4. Runs `terraform apply` on the bootstrap module — creates the CI identity, Workload Identity Federation, and populates all GitHub Actions secrets
 5. Sets `SSH_PRIVATE_KEY` in GitHub secrets via `gh secret set` — the private key never passes through Terraform state
+6. Prompts you to create and paste a **fine-grained Personal Access Token** for Flux, then sets it as `FLUX_GITHUB_TOKEN` in GitHub secrets
+
+> **Why a separate token for Flux?** Flux runs inside the cluster and polls the repository every 60 seconds indefinitely. The `GITHUB_TOKEN` CI provides is ephemeral and expires the moment each run ends — Flux would lose access to Git immediately. `FLUX_GITHUB_TOKEN` is a long-lived PAT that persists across runs. When prompted by the script, create one at **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens** with `Contents: Read-only` for this repository.
 
 **Optional overrides** (set as env vars before running):
 

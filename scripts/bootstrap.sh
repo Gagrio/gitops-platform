@@ -127,6 +127,26 @@ gh secret set SSH_PRIVATE_KEY \
   --body "$(cat "$SSH_KEY_PATH")"
 info "SSH_PRIVATE_KEY set ✅"
 
+# ── FLUX_GITHUB_TOKEN → GitHub secret ────────────────────────────────────────
+step "Setting FLUX_GITHUB_TOKEN in GitHub Actions secrets"
+echo ""
+warn "Flux runs inside the cluster and polls GitHub every 60 seconds indefinitely."
+warn "The default GITHUB_TOKEN CI provides expires when each run ends — Flux would"
+warn "lose access to Git the moment CI finishes."
+echo ""
+info "Create a fine-grained Personal Access Token at:"
+info "  https://github.com/settings/personal-access-tokens/new"
+info "Required permission: Contents → Read-only (for this repository only)"
+echo ""
+read -rsp "Paste your PAT (input hidden, press Enter when done): " FLUX_PAT
+echo ""
+[[ -z "$FLUX_PAT" ]] && error "Token cannot be empty."
+gh secret set FLUX_GITHUB_TOKEN \
+  --repo "$GITHUB_OWNER/$GITHUB_REPO" \
+  --body "$FLUX_PAT"
+unset FLUX_PAT
+info "FLUX_GITHUB_TOKEN set ✅"
+
 # ── done ──────────────────────────────────────────────────────────────────────
 echo ""
 echo -e "${GREEN}🎉 Bootstrap complete!${NC}"
