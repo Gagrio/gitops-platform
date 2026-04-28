@@ -128,8 +128,18 @@ jobs:
         id: cp-ip
         run: echo "ip=$(bash scripts/ci/get-cp-ip.sh)" >> "$GITHUB_OUTPUT"
 
+      - name: Get all node IPs
+        id: all-ips
+        run: |
+          IPS=$(gcloud compute instances list \
+            --project="$GCP_PROJECT" \
+            --filter="labels.environment=${{ env.ENVIRONMENT }}" \
+            --format="value(networkInterfaces[0].accessConfigs[0].natIP)" \
+            | tr '\n' ' ' | xargs)
+          echo "ips=$IPS" >> "$GITHUB_OUTPUT"
+
       - name: Run health checks
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
             ubuntu@${{ steps.cp-ip.outputs.ip }} \
-            "ENVIRONMENT=${{ env.ENVIRONMENT }} NODE_IP=${{ steps.cp-ip.outputs.ip }} bash -s" < scripts/ci/health-check.sh
+            "ENVIRONMENT=${{ env.ENVIRONMENT }} NODE_IPS='${{ steps.all-ips.outputs.ips }}' bash -s" < scripts/ci/health-check.sh

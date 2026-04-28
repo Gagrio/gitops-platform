@@ -45,7 +45,7 @@ echo "✓ Adminer pod Ready"
 # ── [4/4] Adminer HTTP endpoint ───────────────────────────────────────────────
 echo ""
 echo "=== [4/4] Adminer HTTP endpoint ==="
-INGRESS_IP="${NODE_IP}"
+INGRESS_IP=$(echo "$NODE_IPS" | awk '{print $1}')
 echo "  Sending GET http://${INGRESS_IP}/adminer ..."
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 \
   http://"${INGRESS_IP}"/adminer)
@@ -65,8 +65,13 @@ echo "=================================================="
 echo "  PLATFORM ACCESS"
 echo "=================================================="
 echo ""
+echo "  All node IPs are interchangeable — ServiceLB forwards traffic"
+echo "  from any node to the same ingress-nginx backend."
+echo ""
 echo "  Adminer (Database UI)"
-echo "  URL:      http://${INGRESS_IP}/adminer"
+for IP in $NODE_IPS; do
+  echo "  http://${IP}/adminer"
+done
 echo "  System:   PostgreSQL"
 echo "  Server:   pg-rw.postgres.svc.cluster.local"
 echo "  Username: app"
@@ -74,7 +79,9 @@ echo "  Database: app"
 echo "  Password: gcloud secrets versions access latest --secret=${ENV}-pg-app-password"
 echo ""
 echo "  Grafana (Monitoring)"
-echo "  URL:      http://${INGRESS_IP}/grafana"
+for IP in $NODE_IPS; do
+  echo "  http://${IP}/grafana"
+done
 echo "  Username: admin"
 echo "  Password: gcloud secrets versions access latest --secret=${ENV}-grafana-admin-password"
 echo "=================================================="
