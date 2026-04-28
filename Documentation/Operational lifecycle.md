@@ -30,7 +30,7 @@ schedule: "0 2 * * *"   # daily at 02:00 UTC
 | Environment | WAL retention | Base backup retention |
 |---|---|---|
 | dev | 30 days | 30 days |
-| prod | 90 days | 90 days |
+| prod | 30 days | 30 days |
 
 Both are configured in the `Cluster` CR under `backup.barmanObjectStore.retentionPolicy`.
 
@@ -56,11 +56,9 @@ spec:
   externalClusters:
     - name: cluster-backup
       barmanObjectStore:
-        destinationPath: gs://${GCP_PROJECT_ID}-pg-backup/
+        destinationPath: gs://${ENVIRONMENT}-${GCP_PROJECT_ID}-pg-backups
         googleCredentials:
-          applicationCredentials:
-            name: pg-backup-credentials
-            key: credentials.json
+          gkeEnvironment: true   # uses GCE node service account — no key file needed
 ```
 
 What happens after you apply this:

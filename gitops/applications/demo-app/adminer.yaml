@@ -22,7 +22,7 @@ spec:
             - containerPort: 8080
           env:
             - name: ADMINER_DEFAULT_SERVER
-              value: postgres-rw.postgres.svc.cluster.local
+              value: pg-rw.postgres.svc.cluster.local
           resources:
             requests:
               cpu: 50m

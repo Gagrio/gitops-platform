@@ -124,7 +124,7 @@ With the bootstrap complete, deploying follows the branch:
 2. Merge the PR to `main`. CI triggers automatically and will:
    - **Apply** — `terraform apply` provisions all GCP infrastructure; passwords are auto-generated and stored in Secret Manager
    - **Bootstrap** — `ansible-playbook bootstrap.yml` installs k3s and Flux on the nodes; inventory is built dynamically from GCP labels — no static file needed
-   - **Smoke test** — SSHes into the control plane and verifies nodes are Ready, all Flux kustomizations reconciled, Postgres cluster healthy, Adminer pod running
+   - **Post-deploy verification** (`post-deploy-checks.yml`) — waits for Flux convergence and Postgres bootstrap, then asserts nodes are Ready, all kustomizations reconciled, Postgres cluster healthy, Adminer reachable
 
 3. When ready to deploy to prod, push the relevant commits to the `prod` branch. The same pipeline runs, targeting the prod environment and the prod Flux entry point (`gitops/clusters/prod/`).
 
