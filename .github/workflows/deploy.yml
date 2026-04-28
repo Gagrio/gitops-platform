@@ -196,8 +196,6 @@ jobs:
             set -e
             K="sudo k3s kubectl"
 
-            # Dump Flux kustomization status, pod events, and recent logs on any failure.
-            # Runs automatically via EXIT trap so failed runs are self-diagnosing.
             dump_diagnostics() {
               echo ""
               echo "===== DIAGNOSTICS ====="
@@ -211,61 +209,106 @@ jobs:
               sudo k3s kubectl get cluster -n postgres 2>/dev/null || true
               echo "--- Pods (all namespaces) ---"
               sudo k3s kubectl get pods -A 2>/dev/null || true
-              echo "--- Recent Flux logs ---"
+              echo "--- Recent kustomize-controller logs ---"
               sudo k3s kubectl logs -n flux-system \
-                deployment/kustomize-controller --tail=30 2>/dev/null || true
+                deployment/kustomize-controller --tail=40 2>/dev/null || true
               echo "===== END DIAGNOSTICS ====="
             }
             trap 'EC=$?; [[ $EC -ne 0 ]] && dump_diagnostics' EXIT
 
-            echo "=== Nodes ==="
+            # ── [1/8] Nodes ───────────────────────────────────────────────────
+            echo ""
+            echo "=== [1/8] Nodes ==="
+            $K get nodes -o wide
             $K wait node --all --for=condition=Ready --timeout=120s
+            echo "✓ All nodes Ready"
 
-            echo "=== Waiting for Flux kustomizations to appear ==="
+            # ── [2/8] Flux bootstrap ──────────────────────────────────────────
+            echo ""
+            echo "=== [2/8] Flux kustomizations (waiting to appear) ==="
             timeout 120 bash -c \
-              'until sudo k3s kubectl get kustomization common -n flux-system &>/dev/null; do sleep 5; done'
+              'until sudo k3s kubectl get kustomization common -n flux-system &>/dev/null; \
+               do echo "  … Flux not yet started, retrying in 5s"; sleep 5; done'
+            echo "  Current kustomization state:"
+            $K get kustomization -A
 
-            echo "=== common kustomization Ready (namespaces + HelmReleases) ==="
+            # ── [3/8] common ─────────────────────────────────────────────────
+            echo ""
+            echo "=== [3/8] common kustomization (ingress-nginx, ESO, CNPG operator) ==="
             $K wait kustomization/common -n flux-system --for=condition=Ready --timeout=600s
+            echo "  HelmReleases installed:"
+            $K get helmrelease -A
 
-            echo "=== eso-config kustomization Ready (ClusterSecretStore + ExternalSecrets) ==="
+            # ── [4/8] eso-config ──────────────────────────────────────────────
+            echo ""
+            echo "=== [4/8] eso-config kustomization (ClusterSecretStore + ExternalSecrets) ==="
             $K wait kustomization/eso-config -n flux-system --for=condition=Ready --timeout=120s
-
-            echo "=== ExternalSecrets synced ==="
+            echo "  Syncing secrets from GCP Secret Manager..."
             for secret in grafana-admin-password pg-superuser-password pg-app-password pg-replication-password; do
               ns=$( [[ "$secret" == "grafana-admin-password" ]] && echo monitoring || echo postgres )
-              $K wait externalsecret/$secret -n $ns \
-                --for=condition=Ready --timeout=60s
+              $K wait externalsecret/$secret -n $ns --for=condition=Ready --timeout=60s
+              echo "    ✓ $secret → namespace/$ns"
             done
 
-            echo "=== postgres kustomization Ready ==="
+            # ── [5/8] postgres kustomization ─────────────────────────────────
+            echo ""
+            echo "=== [5/8] postgres kustomization (Cluster CR, backup, network policies) ==="
             $K wait kustomization/postgres -n flux-system --for=condition=Ready --timeout=600s
+            echo "✓ Postgres kustomization Ready"
 
-            echo "=== demo-app kustomization Ready ==="
+            # ── [6/8] demo-app kustomization ─────────────────────────────────
+            echo ""
+            echo "=== [6/8] demo-app kustomization (Adminer) ==="
             $K wait kustomization/demo-app -n flux-system --for=condition=Ready --timeout=300s
+            echo "✓ demo-app kustomization Ready"
 
-            echo "=== Postgres cluster healthy ==="
-            $K wait cluster/pg -n postgres --for=condition=Ready --timeout=900s
+            # ── [7/8] Postgres cluster ────────────────────────────────────────
+            echo ""
+            echo "=== [7/8] Postgres cluster (3-instance HA, streaming replication) ==="
+            echo "  Polling every 30s — takes 5-15 min on first deploy..."
+            DEADLINE=$((SECONDS + 900))
+            while true; do
+              PHASE=$($K get cluster pg -n postgres \
+                -o jsonpath='{.status.phase}' 2>/dev/null || echo "unknown")
+              READY=$($K get cluster pg -n postgres \
+                -o jsonpath='{.status.readyInstances}' 2>/dev/null || echo "?")
+              TOTAL=$($K get cluster pg -n postgres \
+                -o jsonpath='{.status.instances}' 2>/dev/null || echo "?")
+              REMAINING=$((DEADLINE - SECONDS))
+              echo "  $(date -u +%H:%M:%SZ)  phase=\"${PHASE}\"  instances=${READY}/${TOTAL} ready  (${REMAINING}s remaining)"
+              if $K wait cluster/pg -n postgres --for=condition=Ready --timeout=5s &>/dev/null; then
+                PRIMARY=$($K get cluster pg -n postgres \
+                  -o jsonpath='{.status.targetPrimary}' 2>/dev/null)
+                echo "✓ Cluster Ready — primary: ${PRIMARY}"
+                break
+              fi
+              [[ $REMAINING -le 5 ]] && { echo "TIMEOUT: cluster/pg did not become Ready"; exit 1; }
+              sleep 30
+            done
+            echo "  Pods:"
+            $K get pods -n postgres -o wide
 
-            echo "=== Postgres pods ==="
+            echo ""
+            echo "  Confirming all 3 instance pods Ready..."
             $K wait pod/pg-1 pod/pg-2 pod/pg-3 -n postgres \
               --for=condition=Ready --timeout=120s
+            echo "✓ pg-1, pg-2, pg-3 Ready"
 
-            echo "=== Adminer pod ==="
+            # ── [8/8] Adminer ─────────────────────────────────────────────────
+            echo ""
+            echo "=== [8/8] Application — Adminer ==="
             $K wait pods -n demo-app -l app=adminer \
               --for=condition=Ready --timeout=120s
-
-            echo "=== Adminer reachable via ingress ==="
             INGRESS_IP=$($K get pod -n ingress-nginx \
               -l app.kubernetes.io/name=ingress-nginx \
               -o jsonpath='{.items[0].status.hostIP}')
             STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 \
               http://${INGRESS_IP}/adminer)
             if [[ "$STATUS" != "200" ]]; then
-              echo "Adminer returned HTTP $STATUS — expected 200"
+              echo "Adminer returned HTTP ${STATUS} — expected 200"
               exit 1
             fi
-            echo "Adminer reachable: HTTP $STATUS"
+            echo "✓ Adminer reachable at http://${INGRESS_IP}/adminer — HTTP ${STATUS}"
 
             echo ""
             echo "✅ All smoke tests passed!"
