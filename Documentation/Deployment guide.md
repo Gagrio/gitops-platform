@@ -231,17 +231,49 @@ gcloud compute instances list \
   --format="table(name, networkInterfaces[0].accessConfigs[0].natIP, labels.role)"
 ```
 
+Retrieve the app user password from Secret Manager:
+```bash
+gcloud secrets versions access latest \
+  --secret=dev-pg-app-password \
+  --project=<your-project-id>
+```
+
 Connect with:
 
 | Field | Value |
 |---|---|
 | System | PostgreSQL |
-| Server | `postgres-rw.postgres.svc.cluster.local` |
+| Server | `pg-rw.postgres.svc.cluster.local` |
 | Username | `app` |
-| Password | `gcloud secrets versions access latest --secret=dev-pg-app-password` |
+| Password | _(output of the gcloud command above)_ |
 | Database | `app` |
 
-A successful login confirms the full stack is working end-to-end. 🎉
+### 3.6 ✅ Verify the Database End-to-End
+
+Once logged in, click **SQL command** in the left sidebar and run:
+
+```sql
+CREATE TABLE greetings (
+  id   SERIAL PRIMARY KEY,
+  msg  TEXT NOT NULL,
+  ts   TIMESTAMPTZ DEFAULT now()
+);
+
+INSERT INTO greetings (msg) VALUES ('Hello from the platform!');
+
+SELECT * FROM greetings;
+```
+
+A row returned confirms writes and reads work on the primary.
+
+To verify streaming replication to both replicas is active:
+
+```sql
+SELECT application_name, state, sent_lsn, write_lsn, replay_lsn
+FROM pg_stat_replication;
+```
+
+You should see two rows (one for each replica) with `state = streaming`. This confirms the full HA stack is working end-to-end.
 
 ---
 
