@@ -11,7 +11,7 @@ This directory takes the bare VMs that Terraform provisioned and turns them into
 
 ## Structure
 
-```
+```text
 ansible/
   ansible.cfg                     ← SSH settings, inventory path, role path
   requirements.yml                ← Ansible Galaxy collections (ansible.posix, community.general)
@@ -32,7 +32,7 @@ ansible/
 
 There is one playbook: `playbooks/bootstrap.yml`. It runs all four roles against the right host groups:
 
-```
+```text
 All nodes     → base + security
 Control plane → kubernetes (control role)
 Workers       → kubernetes (worker role)
@@ -44,17 +44,21 @@ The playbook is **idempotent** — it is safe to re-run. If k3s is already insta
 ## Roles
 
 ### 🖥️ base
+
 Applies to every node. Installs system packages, disables swap (k3s requirement), sets kernel parameters for Kubernetes networking (`net.ipv4.ip_forward`, `net.bridge.bridge-nf-call-iptables`), loads `br_netfilter`, and sets the timezone to UTC.
 
 ### 🔒 security
+
 Hardens the SSH daemon (no root login, no password auth, no X11 forwarding), configures fail2ban with a 1-hour ban window, and sets up UFW with an explicit allowlist of ports k3s needs (22, 6443, 80, 443, 10250, 8472/udp). Everything else is denied by default.
 
 ### ☸️ kubernetes
+
 On the **control plane**: downloads and runs the k3s installer in server mode, waits for the node token to appear, and shares that token with all hosts so workers can use it. Traefik and the default load balancer are disabled — ingress-nginx and MetalLB are managed via Flux instead.
 
 On **workers**: runs the k3s installer in agent mode using the token and control plane URL shared by the previous step.
 
 ### 🔄 flux
+
 Downloads the Flux CLI binary, waits for the cluster API to be reachable, and runs `flux bootstrap github` if Flux isn't already installed. After bootstrapping, it creates two ConfigMaps in the `flux-system` namespace that Flux uses for post-build variable substitution in all Kustomizations:
 
 - `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this project)

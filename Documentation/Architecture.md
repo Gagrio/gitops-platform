@@ -2,7 +2,7 @@
 
 ## 🗺️ Platform Diagram
 
-```
+```text
 ┌─────────────────────────────────────────────────────────────────────────────────┐
 │                            GIT REPOSITORY (GitHub)                              │
 │                                                                                 │
@@ -119,7 +119,7 @@ Configure required reviewers on the `prod` GitHub Environment in repo settings �
 
 Every change to the cluster goes through Git — no one runs `kubectl apply` by hand. Here's what happens from the moment you push code to the moment the cluster reflects it:
 
-```
+```text
   Engineer              GitHub             flux-system            Cluster
      │                     │                    │                    │
      ├── git push ─────────►                    │                    │
@@ -138,7 +138,7 @@ Every change to the cluster goes through Git — no one runs `kubectl apply` by 
 
 Upgrading Postgres is a Git operation. The operator handles the rolling restart with zero downtime — replicas restart first, then the primary fails over to a healthy replica before restarting itself:
 
-```
+```text
   1. Engineer bumps imageName in Cluster CR and opens PR
   2. PR reviewed and merged to main
   3. Flux detects diff, reconciles Cluster CR to cluster
@@ -169,7 +169,7 @@ Upgrading Postgres is a Git operation. The operator handles the rolling restart 
 
 External traffic reaches the cluster through **ingress-nginx**, which is exposed via a Service of type `LoadBalancer`. On this platform, k3s's built-in **ServiceLB** (klipper-lb) handles that Service — it binds ports 80 and 443 directly on every node, so any node's external IP can receive traffic.
 
-```
+```text
 External client → node external IP (port 80/443) → k3s ServiceLB → ingress-nginx → application
 ```
 
@@ -196,7 +196,7 @@ The tradeoff is deliberate: dev uses local disk for simplicity and speed; prod u
 
 Two mechanisms run in parallel to protect your data. WAL archiving gives you continuous coverage; base backups give you a faster restore starting point:
 
-```
+```text
   BACKUP
   ──────
   ScheduledBackup CR  (e.g. daily 02:00 UTC)

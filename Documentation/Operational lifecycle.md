@@ -63,7 +63,7 @@ spec:
 
 What happens after you apply this:
 
-```
+```text
   1. CloudNativePG pulls the most recent base backup from GCS that predates the target time
   2. WAL segments are replayed from the base backup up to the target time
   3. The restored cluster comes online at the exact point-in-time requested
@@ -82,7 +82,7 @@ All upgrades are Git operations. The operator or CI handles the actual execution
 
 Bump the `imageName` in the `Cluster` CR and merge. CloudNativePG performs a **rolling restart** — replicas restart first, then the primary fails over to a healthy replica before restarting itself. Zero downtime throughout.
 
-```
+```text
   1. Engineer bumps imageName in gitops/operators/postgres/cluster.yaml and opens PR
   2. PR reviewed and merged to main
   3. Flux detects diff, reconciles Cluster CR
@@ -103,7 +103,7 @@ Bump `k3s_version` in `ansible/inventory/group_vars/all.yml` and merge. CI runs 
 
 The GitOps-native solution for zero-downtime k3s upgrades is the **k3s System Upgrade Controller**:
 
-```
+```text
   1. Deploy the System Upgrade Controller to the cluster (via Flux)
   2. Create a Plan CR in Git pointing at the target k3s version:
 
@@ -161,7 +161,7 @@ The Grafana instance is pre-provisioned with the **official CloudNativePG dashbo
 
 Access Grafana via ingress-nginx at the same node IP as Adminer:
 
-```
+```text
 http://<any-node-external-ip>/grafana
 ```
 
