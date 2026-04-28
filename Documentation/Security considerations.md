@@ -42,7 +42,9 @@ The `{env}` prefix matches the environment name (`dev` or `prod`). Each environm
 
 ### 🔍 What gitleaks enforces
 
-The `repo-checks.yml` workflow runs [gitleaks](https://github.com/gitleaks/gitleaks) on every PR. It scans the full diff for known secret patterns (API keys, passwords, private keys, tokens) and blocks merge if anything is found. This is the safety net that prevents accidental secret commits.
+The `repo-checks.yml` workflow runs [gitleaks](https://github.com/gitleaks/gitleaks) on every PR. It scans the full git history for known secret patterns (API keys, passwords, private keys, tokens) and blocks merge if anything is found. This is the safety net that prevents accidental secret commits.
+
+A `.gitleaks.toml` allowlist at the repo root holds fingerprints of confirmed false positives — specifically a deleted documentation file that contained the literal text `-----BEGIN RSA PRIVATE KEY-----` as a copy-paste instruction, not an actual key. Any new false positive should be added there with a comment explaining why it is safe.
 
 ### 🔐 GitHub Actions secrets
 

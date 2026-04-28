@@ -114,6 +114,7 @@ With the bootstrap complete, deploying follows the branch:
 
 - **dev** — push any change touching `terraform/`, `ansible/`, `gitops/`, or `.github/workflows/` to `main`
 - **prod** — push the same change to the `prod` branch
+- **manual** — use the `workflow_dispatch` trigger in GitHub → Actions → Deploy → Run workflow; select the target environment from the dropdown (useful for re-running Ansible without a code change, e.g. after a ConfigMap fix)
 
 ### 2.1 🎯 Trigger the First Deploy
 

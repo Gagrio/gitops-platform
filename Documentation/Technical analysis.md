@@ -110,7 +110,7 @@ Flux processes these in dependency order. The layering exists to solve a CRD tim
 The manifests in `clusters/common/`, `operators/`, and `applications/` are **shared** — both dev and prod point at the same files, no duplication. Only the per-environment Flux Kustomization entry points (`clusters/dev/`, `clusters/prod/`) differ. Environment-specific values flow through two ConfigMaps created by Ansible during bootstrap:
 
 - `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this single-project setup)
-- `cluster-vars` — `ENVIRONMENT`, `REGION`, and `STORAGE_CLASS` (per-environment; REGION can differ if dev and prod run in different GCP regions; STORAGE_CLASS differs for storage durability — see Architecture doc)
+- `cluster-vars` — `ENVIRONMENT`, `REGION`, and `STORAGE_CLASS` (per-environment; currently `local-path` for all environments — the k3s built-in provisioner; see Architecture doc for the storage design rationale)
 
 ---
 
@@ -178,6 +178,10 @@ Adminer is defined as a `Deployment` and `Service` in `gitops/applications/demo-
 ### What's instrumented
 
 CloudNativePG exposes PostgreSQL metrics natively via a `PodMonitor` CR that tells Prometheus to scrape those metrics. Grafana is pre-provisioned with the official CloudNativePG dashboard (Grafana ID 20417) for PostgreSQL cluster health — replication lag, connections, WAL activity.
+
+**Why `podMonitorSelectorNilUsesHelmValues: false` is set in the Prometheus spec:** By default, kube-prometheus-stack sets an empty `podMonitorSelector: {}` which it then replaces with `{matchLabels: {release: kube-prometheus-stack}}` — this is what `NilUsesHelmValues: true` (the default) does. The CNPG `PodMonitor` is created in the `postgres` namespace and does not carry that label, so Prometheus would silently ignore it. Setting `NilUsesHelmValues: false` makes the empty selector mean "match everything across all namespaces", which is the expected behaviour.
+
+**Grafana is accessed via ingress-nginx** at `http://<any-node-ip>/grafana` — no port-forwarding needed. The `serve_from_sub_path` option in `grafana.ini` is required for sub-path serving to work correctly; without it relative asset paths break.
 
 ---
 

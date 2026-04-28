@@ -179,16 +179,21 @@ External client → node external IP (port 80/443) → k3s ServiceLB → ingress
 
 ## 🗄️ Storage Design
 
-Postgres storage is intentionally different between environments. The `STORAGE_CLASS` variable is injected into each cluster's `cluster-vars` ConfigMap by Ansible at bootstrap time, and Flux substitutes it into the `Cluster` CR:
+Both environments use `local-path`, the StorageClass that k3s ships with. It provisions storage directly from the node's local filesystem. The `STORAGE_CLASS` variable is injected into each cluster's `cluster-vars` ConfigMap by Ansible at bootstrap time, and Flux substitutes it into the `Cluster` CR.
 
-| Environment | Storage Class | Backing | Durability |
-|-------------|---------------|---------|------------|
-| dev | `local-path` | Local node disk (k3s default) | Lost if the node VM is deleted — CNPG resyncs from primary |
-| prod | `standard` | GCE Persistent Disk (CSI driver) | Network-attached, survives node deletion |
+| Environment | Storage Class | Backing |
+|-------------|---------------|---------|
+| dev | `local-path` | Local node disk (k3s default) |
+| prod | `local-path` | Local node disk (k3s default) |
 
-> ⚠️ For prod to work, the GCE PD CSI driver must be installed on the cluster before Flux reconciles the Postgres `Cluster` CR. Without it, the `standard` StorageClass does not exist and the PVCs will not be provisioned.
+This is not a concern for data durability in practice because CNPG handles durability at the database layer:
 
-The tradeoff is deliberate: dev uses local disk for simplicity and speed; prod uses network-attached storage for the durability guarantees a production database requires.
+- **Streaming replication** to two replicas means the dataset exists on three nodes simultaneously — losing one node does not lose data
+- **Continuous WAL archiving to GCS** enables point-in-time recovery even if all three nodes were lost
+
+The storage layer does not need to be durable because the database layer already is.
+
+> 🏭 **For a GKE deployment or if you install the GCE PD CSI driver on k3s**, you can switch `STORAGE_CLASS` to `standard` (GCE Persistent Disk) or any other CSI-backed class. This gives network-attached storage that survives node deletion independently of CNPG. The variable is the only thing that needs to change — the Cluster CR and all manifests are already parameterised.
 
 ---
 
