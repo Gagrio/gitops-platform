@@ -14,7 +14,7 @@ This directory provisions all the cloud infrastructure on **Google Cloud Platfor
 
 ## 📁 Structure
 
-```
+```text
 terraform/
   bootstrap/          ← run once, manually, before CI exists
   modules/

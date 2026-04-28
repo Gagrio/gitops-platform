@@ -183,7 +183,7 @@ CloudNativePG exposes PostgreSQL metrics natively via a `PodMonitor` CR that tel
 
 ## 🧩 How the Pieces Depend on Each Other
 
-```
+```text
   Terraform
       │  provisions VMs, VPC, firewall, GCS bucket, IAM
       ▼
@@ -221,7 +221,7 @@ Each layer depends on the one above it. Rebuild from scratch? Work top to bottom
 
 Three workflows cover the full repository. Flux handles everything after the deploy workflow autonomously.
 
-```
+```text
   PR opened
       │
       ├── repo-checks.yml (all PRs, no path filter)
