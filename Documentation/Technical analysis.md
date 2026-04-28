@@ -99,6 +99,12 @@ The `gitops/` directory is the root of everything Flux manages. It's structured 
 
 Flux processes these in dependency order. The layering exists to solve a CRD timing problem: Flux dry-runs all resources before applying any. If a CRD doesn't exist (because its operator hasn't installed yet), the dry-run fails for the whole kustomization — a chicken-and-egg loop. Separating HelmReleases from CRs and chaining them with `dependsOn` breaks the loop.
 
+**Why CNPG's HelmRelease lives in `common` but the `Cluster` CR lives in `postgres`:** the same CRD ordering rule applies to CloudNativePG. If both the HelmRelease and the `Cluster` CR were in the same kustomization, Flux would dry-run the `Cluster` CR before the CNPG operator had installed the `Cluster` CRD — and fail. By keeping the HelmRelease in `common` and the CR in `postgres` (which depends on `eso-config`, which depends on `common`), the operator is always installed before the CR is applied.
+
+**Why ESO manifests use `external-secrets.io/v1`, not `v1beta1`:** ESO 0.9+ promoted `ExternalSecret` and `ClusterSecretStore` from the `v1beta1` API group to `v1`. The `v1beta1` group is no longer served. All `ClusterSecretStore` and `ExternalSecret` manifests in this repository use the `v1` API version to match the installed ESO version.
+
+**Why ingress-nginx's `serviceMonitor.enabled` is `false`:** the `ServiceMonitor` CRD is installed by kube-prometheus-stack, which runs in the `monitoring` kustomization — after `common`. If `serviceMonitor.enabled: true` were set in the ingress-nginx HelmRelease values, the Helm chart would attempt to create a `ServiceMonitor` resource, but the CRD wouldn't exist yet and the install would fail. The ServiceMonitor can be re-enabled once `monitoring` is guaranteed to run before `common`, which would require inverting the dependency — not worth it here.
+
 ### 🌍 Per-environment configuration
 
 The manifests in `clusters/common/`, `operators/`, and `applications/` are **shared** — both dev and prod point at the same files, no duplication. Only the per-environment Flux Kustomization entry points (`clusters/dev/`, `clusters/prod/`) differ. Environment-specific values flow through two ConfigMaps created by Ansible during bootstrap:
@@ -136,6 +142,8 @@ Two mechanisms run in parallel:
 
 - **WAL archiving** — PostgreSQL continuously ships Write-Ahead Log segments to a GCS bucket. This is the foundation of point-in-time recovery.
 - **Scheduled base backups** — triggers a full base backup via `barman-cloud-backup` daily. Combined with WAL, this allows recovery to any point within the retention window (30 days in dev, 90 in prod).
+
+**Why `gkeEnvironment: true` for GCS credentials:** the CNPG `Cluster` CR's `backup.barmanObjectStore.googleCredentials.gkeEnvironment` field tells barman-cloud to obtain GCS credentials from the GCE instance metadata server rather than from an explicit service-account key secret. Despite the misleading name (`gke`), this works on any GCE VM — the metadata server is a GCE feature, not a GKE one. The node service account is granted `roles/storage.objectAdmin` on the backup bucket by Terraform, so no credential file or Kubernetes Secret is needed. Setting this to `false` would require creating and mounting an SA key JSON secret, which is operationally heavier and less secure.
 
 ### 🔐 Secrets
 
@@ -244,6 +252,12 @@ Three workflows cover the full repository. Flux handles everything after the dep
       └── Flux reconciles gitops/ continuously (60s loop)
               common → eso-config → postgres/monitoring → demo-app
 ```
+
+### 🔑 Why CI uses `FLUX_GITHUB_TOKEN`, not `GITHUB_TOKEN`
+
+The `GITHUB_TOKEN` that GitHub provides to every workflow run is an ephemeral credential — it expires when the run ends. Flux's `GitRepository` CR polls the repository every 60 seconds, indefinitely. If the GitRepository were configured with the ephemeral `GITHUB_TOKEN`, Flux would lose access to Git as soon as CI finishes and stop reconciling.
+
+`FLUX_GITHUB_TOKEN` is a long-lived fine-grained Personal Access Token stored as a repository secret. CI passes it to the Ansible `flux` role, which sets it in Flux's `flux-system` Secret so that Flux's GitRepository CR has a persistent credential that survives between CI runs.
 
 ### ❌ What CI does NOT do
 

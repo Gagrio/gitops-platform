@@ -76,7 +76,23 @@ cd enclaive-platform-challenge
 
 ---
 
-### 1.3 🚀 Run the Bootstrap Script
+### 1.3 🔑 Create a Long-Lived GitHub Token for Flux
+
+Flux runs inside the cluster and polls the GitHub repository every 60 seconds. It needs a token that stays valid indefinitely — the default `GITHUB_TOKEN` CI provides is ephemeral and expires the moment the workflow run ends, which would cause Flux to lose access to Git as soon as CI finishes.
+
+1. Go to **GitHub → Settings → Developer settings → Personal access tokens → Fine-grained tokens**
+2. Create a token with access to this repository and `Contents: Read-only` permission
+3. Store it as a repository secret named **`FLUX_GITHUB_TOKEN`**:
+   ```bash
+   gh secret set FLUX_GITHUB_TOKEN
+   ```
+   Paste the token value when prompted.
+
+> **Why a separate secret?** The CI workflow explicitly passes `FLUX_GITHUB_TOKEN` (not `GITHUB_TOKEN`) to the Ansible `flux` role so Flux's GitRepository CR is configured with a persistent credential. If you only set `GITHUB_TOKEN`, Flux will lose access to the repository the moment CI completes.
+
+---
+
+### 1.4 🚀 Run the Bootstrap Script
 
 The bootstrap script handles everything else automatically:
 
@@ -272,8 +288,11 @@ The bootstrap state lives in the same GCS bucket under the `bootstrap` prefix an
 | Node not `Ready` | k3s failed to start | SSH into node: `sudo systemctl status k3s` or `sudo systemctl status k3s-agent` |
 | `common` kustomization stuck | HelmRelease install slow on first run | Check: `flux logs --kind=Kustomization --name=common -n flux-system` and `kubectl get helmrelease -A` |
 | `eso-config` kustomization stuck | ESO not yet running or CRD missing | Wait for `common` first; check ESO pod: `kubectl get pods -n external-secrets` |
+| `eso-config` fails with "no matches for ExternalSecret" | ESO manifests must use `external-secrets.io/v1`, not `v1beta1` | ESO 0.9+ promoted the API — `v1beta1` is no longer served |
 | `postgres` kustomization stuck | Depends on `eso-config` — wait for it | Check: `flux logs --kind=Kustomization --name=postgres -n flux-system` |
 | `monitoring` kustomization slow | kube-prometheus-stack can take 15 min | Normal — it runs in parallel and doesn't block the app. Check: `kubectl get helmrelease -n monitoring` |
+| Flux GitRepository shows "Invalid username or token" | `FLUX_GITHUB_TOKEN` secret missing or expired | Regenerate the PAT and re-set the secret: `gh secret set FLUX_GITHUB_TOKEN`; update the in-cluster secret with `kubectl patch secret flux-system -n flux-system` |
+| CNPG Cluster CR rejected by webhook | `gkeEnvironment: false` requires an explicit SA key secret | Cluster CR uses `gkeEnvironment: true` — the node SA accesses GCS via the metadata server; no key file needed |
 | Adminer not reachable in browser | ingress-nginx pod not on that node | Try a different node IP; check which nodes have the pod: `kubectl get pod -n ingress-nginx -o wide` |
 | kubectl connection refused or times out | API server port (6443) firewalled | Confirm your current IP matches `ADMIN_CIDR` used during bootstrap |
 | kubeconfig artifact empty | scp step failed | SSH to control plane manually: `scp ubuntu@<cp-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/config-enclaive-dev` |
