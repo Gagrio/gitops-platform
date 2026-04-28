@@ -26,7 +26,7 @@ For upgrades, you roll them out gradually. Dev first, check it works, then prod,
 
 Everything lives in Git. Nothing is configured by hand on a server somewhere. If you deleted the whole cluster right now you could rebuild it from scratch without calling anyone — just re-run Terraform and Ansible.
 
-Before anything merges, CI checks it: secret scanning, YAML validation, Terraform plan, Ansible lint, manifest validation. After a deploy, a smoke test checks that the nodes are up, Flux has reconciled, Postgres is running, and the app is reachable.
+Before anything merges, CI checks it: secret scanning, YAML validation, Terraform plan, Ansible lint, manifest validation. After a deploy, a post-deploy verification pipeline confirms that the nodes are up, Flux has reconciled, Postgres is running, and the app is reachable.
 
 You always see what Terraform is going to do before it does it. Apply only runs after someone has reviewed and approved. State locking means two people can't apply at the same time.
 

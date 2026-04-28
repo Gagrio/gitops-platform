@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# Fast functional health assertions — meaningful on both fresh and subsequent deploys.
+# Functional health assertions — runs on every deploy, always fast.
+# Verifies nodes, Postgres pods, and application reachability.
 # Runs remotely on the control plane: ssh ubuntu@<cp-ip> bash < scripts/ci/health-check.sh
 set -e
 
@@ -12,7 +13,7 @@ dump_diagnostics() {
   sudo k3s kubectl get pods -A 2>/dev/null || true
   echo "--- Postgres cluster ---"
   sudo k3s kubectl get cluster -n postgres 2>/dev/null || true
-  echo "--- Ingress ---"
+  echo "--- Ingress resources ---"
   sudo k3s kubectl get ingress -A 2>/dev/null || true
   echo "===== END DIAGNOSTICS ====="
 }
@@ -29,12 +30,15 @@ echo "✓ All nodes Ready"
 echo ""
 echo "=== [2/4] Postgres pods ==="
 $K get pods -n postgres -o wide
+echo "  Waiting for pg-1, pg-2, pg-3 to be Ready..."
 $K wait pod/pg-1 pod/pg-2 pod/pg-3 -n postgres --for=condition=Ready --timeout=60s
-echo "✓ pg-1, pg-2, pg-3 Ready"
+echo "✓ All 3 Postgres instances Ready"
 
 # ── [3/4] Adminer pod ────────────────────────────────────────────────────────
 echo ""
 echo "=== [3/4] Adminer pod ==="
+$K get pods -n demo-app -o wide
+echo "  Waiting for Adminer pod to be Ready..."
 $K wait pods -n demo-app -l app=adminer --for=condition=Ready --timeout=60s
 echo "✓ Adminer pod Ready"
 
@@ -44,14 +48,14 @@ echo "=== [4/4] Adminer HTTP endpoint ==="
 INGRESS_IP=$($K get pod -n ingress-nginx \
   -l app.kubernetes.io/name=ingress-nginx \
   -o jsonpath='{.items[0].status.hostIP}')
-echo "  Ingress node IP: ${INGRESS_IP}"
+echo "  Sending GET http://${INGRESS_IP}/adminer ..."
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 \
   http://"${INGRESS_IP}"/adminer)
 if [[ "$STATUS" != "200" ]]; then
-  echo "  Adminer returned HTTP ${STATUS} — expected 200"
+  echo "  FAIL: Adminer returned HTTP ${STATUS} — expected 200"
   exit 1
 fi
-echo "✓ Adminer reachable at http://${INGRESS_IP}/adminer — HTTP ${STATUS}"
+echo "✓ Adminer reachable — HTTP ${STATUS}"
 
 echo ""
 echo "✅ All health checks passed!"

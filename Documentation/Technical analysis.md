@@ -249,15 +249,25 @@ Three workflows cover the full repository. Flux handles everything after the dep
       │         roles/kubernetes (k3s)
       │         roles/flux       (Flux install + bootstrap)
       │
-      └── Job 3: smoke test (SSH into control plane)
+  deploy.yml ends here. post-deploy.yml triggers automatically on success. 🔄
+
+  post-deploy.yml (Post-Deploy Verification)
+      │
+      ├── Job: wait-for-convergence (SSH into control plane)
+      │         polls kustomization/common Ready (≤10 min, prints Flux status every 15s)
+      │         polls kustomization/eso-config Ready (≤2 min)
+      │         waits for all 4 ExternalSecrets to sync from GCP Secret Manager
+      │         polls kustomization/postgres Ready (≤10 min)
+      │         polls kustomization/demo-app Ready (≤5 min)
+      │         polls cluster/pg Ready (≤15 min, prints phase + instance count every 30s)
+      │
+      └── Job: health-check (SSH into control plane)
                 kubectl wait nodes Ready
-                kubectl wait kustomization/common Ready (≤10 min)
-                kubectl wait kustomization/eso-config Ready (≤2 min)
-                kubectl wait kustomization/postgres Ready (≤10 min)
-                kubectl wait kustomization/demo-app Ready (≤5 min)
+                kubectl wait pod/pg-1 pod/pg-2 pod/pg-3 Ready
+                kubectl wait adminer pod Ready
                 curl http://<ingress-node>/adminer → HTTP 200
 
-  CI is done. Flux takes over. 🔄
+  Flux takes over. 🔄
       │
       └── Flux reconciles gitops/ continuously (60s loop)
               common → eso-config → postgres/monitoring → demo-app

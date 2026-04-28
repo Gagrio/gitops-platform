@@ -26,64 +26,88 @@ dump_diagnostics() {
 }
 trap 'EC=$?; [[ $EC -ne 0 ]] && dump_diagnostics' EXIT
 
+# Polls a Flux kustomization, printing its status message every 15s.
+# Flux sets the message to what it's actually doing (installing a HelmRelease,
+# waiting on a dependency, applied revision, etc.) so this gives real progress.
+wait_kustomization() {
+  local name=$1
+  local timeout=$2
+  local DEADLINE=$((SECONDS + timeout))
+  while true; do
+    local MSG REMAINING
+    MSG=$($K get kustomization/"$name" -n flux-system \
+      -o jsonpath='{.status.conditions[?(@.type=="Ready")].message}' 2>/dev/null \
+      || echo "not found yet")
+    REMAINING=$((DEADLINE - SECONDS))
+    echo "  $(date -u +%H:%M:%SZ)  $name: ${MSG}  (${REMAINING}s remaining)"
+    if $K wait kustomization/"$name" -n flux-system \
+        --for=condition=Ready --timeout=5s &>/dev/null; then
+      echo "✓ $name Ready"
+      return 0
+    fi
+    [[ $REMAINING -le 5 ]] && { echo "TIMEOUT: $name did not become Ready"; return 1; }
+    sleep 15
+  done
+}
+
 # ── [1/6] Flux kustomizations appear ─────────────────────────────────────────
 echo ""
-echo "=== [1/6] Waiting for Flux kustomizations to appear ==="
+echo "=== [1/6] Waiting for Flux to start ==="
+echo "  Retrying every 5s until the kustomization API is available..."
 timeout 120 bash -c \
   'until sudo k3s kubectl get kustomization common -n flux-system &>/dev/null; \
-   do echo "  … Flux not yet started, retrying in 5s"; sleep 5; done'
-echo "  Current state:"
+   do echo "  $(date -u +%H:%M:%SZ)  Flux controllers not yet running"; sleep 5; done'
+echo "  Kustomizations registered:"
 $K get kustomization -A
 
 # ── [2/6] common ─────────────────────────────────────────────────────────────
 echo ""
-echo "=== [2/6] common kustomization (ingress-nginx, ESO, CNPG operator) ==="
-$K wait kustomization/common -n flux-system --for=condition=Ready --timeout=600s
+echo "=== [2/6] common (installs ingress-nginx, ESO, and CNPG operator via HelmRelease) ==="
+echo "  HelmReleases can take several minutes to pull and install on first deploy."
+wait_kustomization common 600
 echo "  HelmReleases:"
 $K get helmrelease -A
-echo "✓ common Ready"
 
 # ── [3/6] eso-config ─────────────────────────────────────────────────────────
 echo ""
-echo "=== [3/6] eso-config kustomization (ClusterSecretStore + ExternalSecrets) ==="
-$K wait kustomization/eso-config -n flux-system --for=condition=Ready --timeout=120s
-echo "  Syncing secrets from GCP Secret Manager..."
+echo "=== [3/6] eso-config (ClusterSecretStore + ExternalSecrets → GCP Secret Manager) ==="
+wait_kustomization eso-config 120
+echo "  Waiting for each ExternalSecret to sync from GCP Secret Manager..."
 for secret in grafana-admin-password pg-superuser-password pg-app-password pg-replication-password; do
   ns=$( [[ "$secret" == "grafana-admin-password" ]] && echo monitoring || echo postgres )
   $K wait externalsecret/"$secret" -n "$ns" --for=condition=Ready --timeout=60s
-  echo "    ✓ $secret → namespace/$ns"
+  echo "    ✓ $secret synced to namespace/$ns"
 done
 
 # ── [4/6] postgres kustomization ─────────────────────────────────────────────
 echo ""
-echo "=== [4/6] postgres kustomization (Cluster CR, backup schedule, network policies) ==="
-$K wait kustomization/postgres -n flux-system --for=condition=Ready --timeout=600s
-echo "✓ postgres kustomization Ready"
+echo "=== [4/6] postgres (Cluster CR, scheduled backup, network policies) ==="
+wait_kustomization postgres 600
 
 # ── [5/6] demo-app kustomization ─────────────────────────────────────────────
 echo ""
-echo "=== [5/6] demo-app kustomization (Adminer) ==="
-$K wait kustomization/demo-app -n flux-system --for=condition=Ready --timeout=300s
-echo "✓ demo-app kustomization Ready"
+echo "=== [5/6] demo-app (Adminer deployment, service, ingress) ==="
+wait_kustomization demo-app 300
 
 # ── [6/6] Postgres cluster bootstrap ─────────────────────────────────────────
 echo ""
-echo "=== [6/6] Postgres cluster (3-instance HA, streaming replication) ==="
-echo "  Polling every 30s — takes 5-15 min on first deploy, seconds on subsequent ones..."
+echo "=== [6/6] Postgres cluster bootstrapping ==="
+echo "  CNPG provisions 3 instances with streaming replication and WAL archiving to GCS."
+echo "  First deploy takes 5-15 min. Subsequent deploys pass in seconds."
 DEADLINE=$((SECONDS + 900))
 while true; do
   PHASE=$($K get cluster pg -n postgres \
-    -o jsonpath='{.status.phase}' 2>/dev/null || echo "unknown")
+    -o jsonpath='{.status.phase}' 2>/dev/null || echo "not yet visible")
   READY=$($K get cluster pg -n postgres \
-    -o jsonpath='{.status.readyInstances}' 2>/dev/null || echo "?")
+    -o jsonpath='{.status.readyInstances}' 2>/dev/null || echo "0")
   TOTAL=$($K get cluster pg -n postgres \
-    -o jsonpath='{.status.instances}' 2>/dev/null || echo "?")
+    -o jsonpath='{.status.instances}' 2>/dev/null || echo "3")
   REMAINING=$((DEADLINE - SECONDS))
-  echo "  $(date -u +%H:%M:%SZ)  phase=\"${PHASE}\"  instances=${READY}/${TOTAL} ready  (${REMAINING}s remaining)"
+  echo "  $(date -u +%H:%M:%SZ)  ${PHASE}  —  ${READY}/${TOTAL} instances ready  (${REMAINING}s remaining)"
   if $K wait cluster/pg -n postgres --for=condition=Ready --timeout=5s &>/dev/null; then
     PRIMARY=$($K get cluster pg -n postgres \
       -o jsonpath='{.status.targetPrimary}' 2>/dev/null)
-    echo "✓ Cluster Ready — primary: ${PRIMARY}"
+    echo "✓ Postgres cluster Ready — primary: ${PRIMARY}"
     break
   fi
   [[ $REMAINING -le 5 ]] && { echo "TIMEOUT: cluster/pg did not become Ready"; exit 1; }
@@ -91,4 +115,4 @@ while true; do
 done
 
 echo ""
-echo "✅ Convergence complete — all Flux kustomizations reconciled, Postgres cluster Ready"
+echo "✅ Convergence complete"

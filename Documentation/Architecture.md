@@ -95,7 +95,8 @@ Three GitHub Actions workflows cover the full repository:
 |----------|---------|-------------|---------|
 | `repo-checks.yml` | Every PR | None — catches everything | Secret scanning, YAML lint, Markdown lint |
 | `validate.yml` | Every PR | `terraform/**`, `ansible/**`, `gitops/**` | Terraform plan, Ansible lint, manifest validation |
-| `deploy.yml` | Push to `main` or `prod` | `terraform/**`, `ansible/**` | Terraform apply, Ansible bootstrap, smoke test |
+| `deploy.yml` | Push to `main` or `prod` | `terraform/**`, `ansible/**`, `gitops/**` | Terraform apply, Ansible bootstrap, kubeconfig upload |
+| `post-deploy.yml` | After `deploy.yml` succeeds; manual via UI; `scripts/ci/**` changes | — | Wait for Flux convergence + Postgres bootstrap; functional health checks |
 
 **Why two separate validate/deploy files instead of one?**
 The split keeps the read-only safety check (validate) clearly separated from the destructive operation (apply). It also means validate can run on untrusted PRs without needing the same secret access that apply requires.

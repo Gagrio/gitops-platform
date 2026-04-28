@@ -79,7 +79,7 @@ The bootstrap Terraform module sets this up automatically. The CI service accoun
 
 ### 🔒 Cluster access (kubectl)
 
-The Kubernetes API (port 6443) is firewalled to the `admin_cidr` only — not open to the internet. CI does not talk to the API directly; the smoke test SSHes into the control plane and runs `sudo k3s kubectl` there.
+The Kubernetes API (port 6443) is firewalled to the `admin_cidr` only — not open to the internet. CI does not talk to the API directly; the post-deploy verification pipeline SSHes into the control plane and runs `sudo k3s kubectl` there.
 
 RBAC is managed by k3s defaults. For production, define explicit ClusterRoles and RoleBindings scoped to each team or application.
 

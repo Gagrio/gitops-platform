@@ -1,15 +1,18 @@
 ---
-# Runs after a successful Deploy, and on any change to the test scripts themselves.
+# Post-deploy verification pipeline.
+# Runs after a successful Deploy, on changes to the verification scripts themselves,
+# or manually from the GitHub Actions UI.
+#
 # Two-job structure:
-#   wait-for-convergence — Flux kustomization + Postgres cluster waits (~15 min fresh, seconds after)
+#   wait-for-convergence — waits for Flux and Postgres to finish async bootstrapping
 #   health-check         — fast functional assertions: nodes, pods, Adminer HTTP 200
-name: Smoke Test
+name: Post-Deploy Verification
 
 on:
   workflow_dispatch:
     inputs:
       environment:
-        description: "Environment to test"
+        description: "Environment to verify"
         required: true
         default: dev
         type: choice
@@ -26,7 +29,7 @@ on:
       - prod
     paths:
       - "scripts/ci/**"
-      - ".github/workflows/smoke-test.yml"
+      - ".github/workflows/post-deploy.yml"
 
 permissions:
   contents: read
@@ -52,6 +55,7 @@ jobs:
     # On workflow_run: only proceed if Deploy succeeded
     if: >-
       github.event_name == 'push' ||
+      github.event_name == 'workflow_dispatch' ||
       github.event.workflow_run.conclusion == 'success'
     environment: ${{ env.ENVIRONMENT }}
     env:
@@ -60,7 +64,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-
 
       - uses: google-github-actions/auth@v2
         with:
@@ -95,7 +98,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
-
 
       - uses: google-github-actions/auth@v2
         with:
