@@ -45,11 +45,8 @@ echo "✓ Adminer pod Ready"
 # ── [4/4] Adminer HTTP endpoint ───────────────────────────────────────────────
 echo ""
 echo "=== [4/4] Adminer HTTP endpoint ==="
-INGRESS_NODE=$($K get pod -n ingress-nginx \
-  -l app.kubernetes.io/name=ingress-nginx \
-  -o jsonpath='{.items[0].spec.nodeName}')
-INGRESS_IP=$($K get node "$INGRESS_NODE" \
-  -o jsonpath='{.status.addresses[?(@.type=="ExternalIP")].address}')
+INGRESS_IP=$(curl -sf -H "Metadata-Flavor: Google" \
+  http://metadata.google.internal/computeMetadata/v1/instance/network-interfaces/0/access-configs/0/external-ip)
 echo "  Sending GET http://${INGRESS_IP}/adminer ..."
 STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 \
   http://"${INGRESS_IP}"/adminer)
