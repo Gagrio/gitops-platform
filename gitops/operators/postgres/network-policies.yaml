@@ -1,5 +1,9 @@
 ---
-# Deny all ingress to Postgres pods except from the demo-app namespace.
+# Ingress rules for CNPG postgres pods.
+# Three sources need access:
+#   1. postgres namespace itself — operator polls port 8000 (status), replicas stream on 5432
+#   2. demo-app namespace — application connections on 5432
+#   3. monitoring namespace — Prometheus scrapes metrics on 9187
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -15,6 +19,19 @@ spec:
     - from:
         - namespaceSelector:
             matchLabels:
+              kubernetes.io/metadata.name: postgres
+      ports:
+        - port: 8000
+        - port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
               kubernetes.io/metadata.name: demo-app
       ports:
         - port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+      ports:
+        - port: 9187
