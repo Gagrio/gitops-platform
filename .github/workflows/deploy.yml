@@ -26,6 +26,8 @@ jobs:
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
+    outputs:
+      subnet_cidr: ${{ steps.tf-outputs.outputs.subnet_cidr }}
     environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
@@ -56,6 +58,11 @@ jobs:
       - name: Terraform apply
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: terraform apply -auto-approve
+
+      - name: Capture Terraform outputs
+        id: tf-outputs
+        working-directory: terraform/environments/${{ env.ENVIRONMENT }}
+        run: echo "subnet_cidr=$(terraform output -raw subnet_cidr)" >> "$GITHUB_OUTPUT"
 
   # ── Ansible ────────────────────────────────────────────────────────────────
   ansible-bootstrap:
@@ -107,7 +114,7 @@ jobs:
                           cluster_env=${{ env.ENVIRONMENT }} \
                           gitops_branch=${{ github.ref_name }} \
                           github_owner=${{ github.repository_owner }} \
-                          subnet_cidr=${{ secrets.SUBNET_CIDR }} \
+                          subnet_cidr=${{ needs.terraform-apply.outputs.subnet_cidr }} \
                           storage_class=${{ env.STORAGE_CLASS }} \
                           github_token=${{ secrets.FLUX_GITHUB_TOKEN }}"
 

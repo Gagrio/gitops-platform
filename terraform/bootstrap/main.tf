@@ -128,12 +128,6 @@ resource "github_actions_secret" "admin_cidr" {
   plaintext_value = var.admin_cidr
 }
 
-resource "github_actions_secret" "subnet_cidr" {
-  repository      = var.github_repo
-  secret_name     = "SUBNET_CIDR"
-  plaintext_value = var.subnet_cidr
-}
-
 # SSH public key is not sensitive — it is safe to store in GitHub secrets and Terraform state
 resource "github_actions_secret" "ssh_public_key" {
   repository      = var.github_repo

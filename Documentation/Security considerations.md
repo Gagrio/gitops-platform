@@ -46,6 +46,8 @@ The `repo-checks.yml` workflow runs [gitleaks](https://github.com/gitleaks/gitle
 
 CI secrets (GCP project ID, WIF provider, service account, SSH key, state bucket) are stored in GitHub Actions secrets scoped to the `dev` Environment. The SSH private key in particular is set via `gh secret set` in the bootstrap script — it never passes through Terraform state, a file on disk, or a CI log.
 
+The subnet CIDR is **not** stored as a secret. After `terraform apply` runs, CI reads it back from a Terraform output (`terraform output -raw subnet_cidr`) and passes it directly to Ansible. This keeps the value in one place (Terraform) rather than duplicating it in secrets where it would have to be kept in sync manually.
+
 ---
 
 ## 👤 Access Control

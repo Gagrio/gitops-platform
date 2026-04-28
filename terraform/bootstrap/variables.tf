@@ -34,12 +34,6 @@ variable "admin_cidr" {
   description = "Your public IP in CIDR notation (e.g. 203.0.113.10/32) — restricts SSH and k8s API access"
 }
 
-variable "subnet_cidr" {
-  type        = string
-  default     = "10.0.0.0/24"
-  description = "Subnet CIDR for the cluster nodes — must match the value in environments/dev/variables.tf"
-}
-
 variable "ssh_public_key" {
   type        = string
   description = "Contents of the SSH public key file (~/.ssh/enclaive-ci.pub) — injected into GCE nodes"

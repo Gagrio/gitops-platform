@@ -99,7 +99,6 @@ What it does:
 ```bash
 REGION=europe-west1          # GCP region
 ADMIN_CIDR=203.0.113.10/32  # your IP for k8s API access (auto-detected if not set)
-SUBNET_CIDR=10.0.0.0/24     # cluster subnet
 bash scripts/bootstrap.sh
 ```
 

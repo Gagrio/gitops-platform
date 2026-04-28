@@ -1,3 +1,7 @@
+output "subnet_cidr" {
+  value = module.network.subnet_cidr
+}
+
 output "node_internal_ips" {
   value = { for k, v in module.nodes : k => v.internal_ip }
 }

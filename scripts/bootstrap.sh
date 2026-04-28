@@ -11,7 +11,6 @@
 #   REGION          — GCP region (default: europe-west1)
 #   TF_STATE_BUCKET — GCS bucket name (default: <project-id>-tfstate)
 #   ADMIN_CIDR      — CIDR for k8s API access (default: your current public IP/32)
-#   SUBNET_CIDR     — cluster subnet CIDR (default: 10.0.0.0/24)
 #   GITHUB_REPO     — repository name (default: enclaive-platform-challenge)
 #   SSH_KEY_PATH    — path to SSH key (default: ~/.ssh/enclaive-ci)
 
@@ -63,9 +62,6 @@ info "GitHub owner:   $GITHUB_OWNER"
 GITHUB_REPO="${GITHUB_REPO:-enclaive-platform-challenge}"
 info "GitHub repo:    $GITHUB_REPO"
 
-SUBNET_CIDR="${SUBNET_CIDR:-10.0.0.0/24}"
-info "Subnet CIDR:    $SUBNET_CIDR"
-
 SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/.ssh/enclaive-ci}"
 
 # ── GCS state bucket ──────────────────────────────────────────────────────────
@@ -99,7 +95,6 @@ github_owner    = "$GITHUB_OWNER"
 github_repo     = "$GITHUB_REPO"
 tf_state_bucket = "$TF_STATE_BUCKET"
 admin_cidr      = "$ADMIN_CIDR"
-subnet_cidr     = "$SUBNET_CIDR"
 ssh_public_key  = "$SSH_PUBLIC_KEY"
 EOF
 info "terraform.tfvars written (gitignored — will not be committed) ✅"
