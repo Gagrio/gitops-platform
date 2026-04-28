@@ -85,7 +85,7 @@ jobs:
 
       - name: Get control plane IP
         id: cp-ip
-        run: echo "ip=$(bash scripts/ci/get-cp-ip.sh)" >> "$GITHUB_OUTPUT"
+        run: echo "ip=$(bash scripts/ci/get-node-ips.sh control)" >> "$GITHUB_OUTPUT"
 
       - name: Wait for Flux convergence and Postgres bootstrap
         run: |
@@ -126,7 +126,7 @@ jobs:
 
       - name: Get control plane IP
         id: cp-ip
-        run: echo "ip=$(bash scripts/ci/get-cp-ip.sh)" >> "$GITHUB_OUTPUT"
+        run: echo "ip=$(bash scripts/ci/get-node-ips.sh control)" >> "$GITHUB_OUTPUT"
 
       - name: Get all node IPs
         id: all-ips
