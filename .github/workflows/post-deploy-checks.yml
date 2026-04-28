@@ -29,7 +29,7 @@ on:
       - prod
     paths:
       - "scripts/ci/**"
-      - ".github/workflows/post-deploy.yml"
+      - ".github/workflows/post-deploy-checks.yml"
 
 permissions:
   contents: read
