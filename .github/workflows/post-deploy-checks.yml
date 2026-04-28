@@ -132,4 +132,4 @@ jobs:
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
             ubuntu@${{ steps.cp-ip.outputs.ip }} \
-            "ENVIRONMENT=${{ env.ENVIRONMENT }} bash -s" < scripts/ci/health-check.sh
+            "ENVIRONMENT=${{ env.ENVIRONMENT }} NODE_IP=${{ steps.cp-ip.outputs.ip }} bash -s" < scripts/ci/health-check.sh
