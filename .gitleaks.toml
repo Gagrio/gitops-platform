@@ -1,0 +1,17 @@
+title = "gitleaks config"
+
+[allowlist]
+description = "False positives — documentation text, not real secrets"
+commits = []
+
+# docs/deployment-guide.md (old, deleted file) contained the literal text
+# '-----BEGIN RSA PRIVATE KEY-----' as an example in a copy-paste instruction.
+# The file was replaced by Documentation/Deployment guide.md which does not
+# contain key material. The finding refers to a string in documentation, not
+# an actual key.
+[[allowlist.findings]]
+id = "docs-deployment-guide-private-key-example"
+description = "Private key header in deleted docs/deployment-guide.md is example text"
+fingerprints = [
+  "ebc740311b3e4f06a958c639e6f8ee60a78e8392:docs/deployment-guide.md:private-key:158",
+]
