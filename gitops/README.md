@@ -56,7 +56,7 @@ Two ConfigMaps in the `flux-system` namespace supply these variables (created by
 | ConfigMap | Keys | Scope |
 |---|---|---|
 | `cluster-global` | `GCP_PROJECT_ID` | Same for all environments (single GCP project) |
-| `cluster-vars` | `ENVIRONMENT`, `REGION`, `STORAGE_CLASS` | Per-environment; REGION can differ if dev and prod run in different GCP regions; STORAGE_CLASS differs for storage durability |
+| `cluster-vars` | `ENVIRONMENT`, `REGION`, `STORAGE_CLASS` | Per-environment; REGION can differ if dev and prod run in different GCP regions; STORAGE_CLASS is `local-path` for all environments (the k3s built-in provisioner — a GCE PD-backed StorageClass would require the GCE CSI driver) |
 
 Every Flux Kustomization references both via `postBuild.substituteFrom`. Manifests use `${VARIABLE}` syntax wherever an environment-specific value is needed (e.g. `gs://${ENVIRONMENT}-${GCP_PROJECT_ID}-pg-backups`).
 

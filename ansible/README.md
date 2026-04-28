@@ -58,7 +58,7 @@ On **workers**: runs the k3s installer in agent mode using the token and control
 Downloads the Flux CLI binary, waits for the cluster API to be reachable, and runs `flux bootstrap github` if Flux isn't already installed. After bootstrapping, it creates two ConfigMaps in the `flux-system` namespace that Flux uses for post-build variable substitution in all Kustomizations:
 
 - `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this project)
-- `cluster-vars` — `ENVIRONMENT`, `REGION`, and `STORAGE_CLASS` (per-environment; STORAGE_CLASS differs between dev and prod for storage durability)
+- `cluster-vars` — `ENVIRONMENT`, `REGION`, and `STORAGE_CLASS` (per-environment; currently `local-path` for all environments — the k3s built-in provisioner; switching to a GCE PD-backed StorageClass requires installing the GCE CSI driver separately)
 
 Finally, it copies the kubeconfig to `/tmp/kubeconfig-enclaive-dev` so the CI job can upload it as an artifact.
 
