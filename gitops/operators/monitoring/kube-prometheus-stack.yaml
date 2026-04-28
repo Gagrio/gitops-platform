@@ -58,11 +58,15 @@ spec:
         resources:
           requests:
             memory: 512Mi
-        # Watch PodMonitors and ServiceMonitors in all namespaces, not just monitoring.
-        # Required so the PodMonitor CNPG creates in the postgres namespace is discovered.
+        # Watch all PodMonitors and ServiceMonitors across all namespaces.
+        # NilUsesHelmValues must be false — otherwise an empty selector falls back to
+        # matching only monitors labelled release=kube-prometheus-stack, which excludes
+        # the PodMonitor CNPG creates in the postgres namespace.
         podMonitorNamespaceSelector: {}
         podMonitorSelector: {}
+        podMonitorSelectorNilUsesHelmValues: false
         serviceMonitorNamespaceSelector: {}
         serviceMonitorSelector: {}
+        serviceMonitorSelectorNilUsesHelmValues: false
     alertmanager:
       enabled: false
