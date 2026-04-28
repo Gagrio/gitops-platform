@@ -1,0 +1,105 @@
+---
+# Runs after a successful Deploy, and on any change to the test scripts themselves.
+# Two-job structure:
+#   wait-for-convergence — Flux kustomization + Postgres cluster waits (~15 min fresh, seconds after)
+#   health-check         — fast functional assertions: nodes, pods, Adminer HTTP 200
+name: Smoke Test
+
+on:
+  workflow_run:
+    workflows: ["Deploy"]
+    types:
+      - completed
+  push:
+    branches:
+      - main
+      - prod
+    paths:
+      - "scripts/ci/**"
+      - ".github/workflows/smoke-test.yml"
+
+permissions:
+  contents: read
+  id-token: write
+
+# Derive environment from whichever trigger fired
+env:
+  ENVIRONMENT: >-
+    ${{
+      github.event_name == 'workflow_run'
+        && (github.event.workflow_run.head_branch == 'main' && 'dev' || github.event.workflow_run.head_branch)
+        || (github.ref_name == 'main' && 'dev' || github.ref_name)
+    }}
+
+jobs:
+
+  # ── Wait for Convergence ───────────────────────────────────────────────────
+  wait-for-convergence:
+    name: Wait for Convergence
+    runs-on: ubuntu-latest
+    # On workflow_run: only proceed if Deploy succeeded
+    if: >-
+      github.event_name == 'push' ||
+      github.event.workflow_run.conclusion == 'success'
+    environment: ${{ env.ENVIRONMENT }}
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Write SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/enclaive-ci
+          chmod 600 ~/.ssh/enclaive-ci
+
+      - name: Get control plane IP
+        id: cp-ip
+        run: echo "ip=$(bash scripts/ci/get-cp-ip.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Wait for Flux convergence and Postgres bootstrap
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
+            ubuntu@${{ steps.cp-ip.outputs.ip }} \
+            bash < scripts/ci/wait-for-convergence.sh
+
+  # ── Health Check ───────────────────────────────────────────────────────────
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    needs: wait-for-convergence
+    environment: ${{ env.ENVIRONMENT }}
+    env:
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
+
+      - name: Write SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/enclaive-ci
+          chmod 600 ~/.ssh/enclaive-ci
+
+      - name: Get control plane IP
+        id: cp-ip
+        run: echo "ip=$(bash scripts/ci/get-cp-ip.sh)" >> "$GITHUB_OUTPUT"
+
+      - name: Run health checks
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
+            ubuntu@${{ steps.cp-ip.outputs.ip }} \
+            bash < scripts/ci/health-check.sh
