@@ -14,12 +14,20 @@ on:
       - "ansible/**"
       - "gitops/**"
       - ".github/workflows/**"
+      - "scripts/ci/**"
 
 permissions:
   contents: read
   id-token: write  # required for Workload Identity Federation
 
+# Reusable GCP auth block referenced by all jobs
+# NOTE: SSH key management is the one step not covered by an upstream action here.
+# webfactory/ssh-agent@v0.9 would handle it cleanly (key stays in-memory, never on disk)
+# but requires removing private_key_file from ansible/ansible.cfg first.
+
 jobs:
+
+  # ── Terraform ──────────────────────────────────────────────────────────────
   terraform-apply:
     name: Terraform Apply
     runs-on: ubuntu-latest
@@ -31,17 +39,14 @@ jobs:
       TF_VAR_admin_cidr: ${{ secrets.ADMIN_CIDR }}
       TF_VAR_ssh_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Authenticate to GCP via Workload Identity Federation
-        uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-      - name: Set up Terraform
-        uses: hashicorp/setup-terraform@v3
+      - uses: hashicorp/setup-terraform@v3
         with:
           terraform_version: "~1.7"
           terraform_wrapper: false
@@ -57,23 +62,22 @@ jobs:
         working-directory: terraform/environments/${{ env.ENVIRONMENT }}
         run: terraform apply -auto-approve
 
+  # ── Ansible ────────────────────────────────────────────────────────────────
   ansible-bootstrap:
     name: Ansible Bootstrap
     runs-on: ubuntu-latest
     needs: terraform-apply
     permissions:
       contents: write   # Flux bootstrap pushes flux-system manifests to the repo
-      id-token: write   # required for Workload Identity Federation
+      id-token: write
     environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
-      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}    # read by gcp_compute inventory plugin
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Authenticate to GCP via Workload Identity Federation
-        uses: google-github-actions/auth@v2
+      - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -89,45 +93,16 @@ jobs:
           echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/enclaive-ci
           chmod 600 ~/.ssh/enclaive-ci
 
-      - name: Wait for SSH to be available on all nodes
-        run: |
-          for ip in $(gcloud compute instances list \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --filter="labels.environment=${{ env.ENVIRONMENT }}" \
-            --format="get(networkInterfaces[0].accessConfigs[0].natIP)"); do
-            echo "Waiting for SSH on $ip..."
-            timeout 120 bash -c "until ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci ubuntu@$ip 'echo ok' 2>/dev/null; do sleep 5; done"
-          done
+      - name: Wait for SSH on all nodes
+        run: bash scripts/ci/wait-for-ssh.sh
 
-      - name: Generate inventory from GCP
-        run: |
-          CONTROL=$(gcloud compute instances list \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --filter="labels.environment=${{ env.ENVIRONMENT }} AND labels.role=control" \
-            --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
-          WORKERS=$(gcloud compute instances list \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --filter="labels.environment=${{ env.ENVIRONMENT }} AND labels.role=worker" \
-            --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
-          cat > /tmp/hosts.ini << EOF
-          [control]
-          $CONTROL
-
-          [worker]
-          $WORKERS
-
-          [k3s_cluster:children]
-          control
-          worker
-          EOF
-          echo "Generated inventory:"
-          cat /tmp/hosts.ini
+      - name: Generate Ansible inventory
+        run: bash scripts/ci/generate-inventory.sh
 
       - name: Run bootstrap playbook
         working-directory: ansible
         env:
           PYTHONUNBUFFERED: "1"
-          # dev uses local node disk (fast, no extra cost); prod uses GCE PD (durable, survives node deletion)
           STORAGE_CLASS: ${{ env.ENVIRONMENT == 'prod' && 'standard' || 'local-path' }}
         run: |
           ansible-playbook playbooks/bootstrap.yml \
@@ -141,35 +116,30 @@ jobs:
                           storage_class=${{ env.STORAGE_CLASS }} \
                           github_token=${{ secrets.FLUX_GITHUB_TOKEN }}"
 
-      - name: Fetch kubeconfig from control plane and patch server address
-        run: |
-          CP_IP=$(gcloud compute instances list \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --filter="labels.environment=${{ env.ENVIRONMENT }} AND labels.role=control" \
-            --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
-            ubuntu@${CP_IP}:/etc/rancher/k3s/k3s.yaml \
-            /tmp/kubeconfig-enclaive-${{ env.ENVIRONMENT }}
-          sed -i "s|https://127.0.0.1:6443|https://${CP_IP}:6443|" \
-            /tmp/kubeconfig-enclaive-${{ env.ENVIRONMENT }}
+      - name: Fetch kubeconfig from control plane
+        run: bash scripts/ci/fetch-kubeconfig.sh
 
-      - name: Upload kubeconfig artifact
-        uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v4
         with:
           name: kubeconfig-enclaive-${{ env.ENVIRONMENT }}
           path: /tmp/kubeconfig-enclaive-${{ env.ENVIRONMENT }}
           retention-days: 7
 
-  smoke-test:
-    name: Smoke Test
+  # ── Convergence ────────────────────────────────────────────────────────────
+  # Waits for Flux kustomizations and the Postgres cluster to finish bootstrapping.
+  # On first deploy this takes 15-20 minutes. On subsequent deploys it passes in seconds.
+  wait-for-convergence:
+    name: Wait for Convergence
     runs-on: ubuntu-latest
     needs: ansible-bootstrap
     environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
     env:
       ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
     steps:
-      - name: Authenticate to GCP via Workload Identity Federation
-        uses: google-github-actions/auth@v2
+      - uses: actions/checkout@v4
+
+      - uses: google-github-actions/auth@v2
         with:
           workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
@@ -182,134 +152,46 @@ jobs:
 
       - name: Get control plane IP
         id: cp-ip
-        run: |
-          CP_IP=$(gcloud compute instances list \
-            --project=${{ secrets.GCP_PROJECT_ID }} \
-            --filter="labels.environment=${{ env.ENVIRONMENT }} AND labels.role=control" \
-            --format="get(networkInterfaces[0].accessConfigs[0].natIP)")
-          echo "ip=$CP_IP" >> "$GITHUB_OUTPUT"
+        run: echo "ip=$(bash scripts/ci/get-cp-ip.sh)" >> "$GITHUB_OUTPUT"
 
-      - name: Run smoke tests on control plane
+      - name: Wait for Flux convergence and Postgres bootstrap
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
-            ubuntu@${{ steps.cp-ip.outputs.ip }} bash << 'REMOTE'
-            set -e
-            K="sudo k3s kubectl"
+            ubuntu@${{ steps.cp-ip.outputs.ip }} \
+            bash < scripts/ci/wait-for-convergence.sh
 
-            dump_diagnostics() {
-              echo ""
-              echo "===== DIAGNOSTICS ====="
-              echo "--- Flux kustomizations ---"
-              sudo k3s kubectl get kustomization -A 2>/dev/null || true
-              echo "--- HelmReleases ---"
-              sudo k3s kubectl get helmrelease -A 2>/dev/null || true
-              echo "--- ExternalSecrets ---"
-              sudo k3s kubectl get externalsecret -A 2>/dev/null || true
-              echo "--- Postgres cluster ---"
-              sudo k3s kubectl get cluster -n postgres 2>/dev/null || true
-              echo "--- Pods (all namespaces) ---"
-              sudo k3s kubectl get pods -A 2>/dev/null || true
-              echo "--- Recent kustomize-controller logs ---"
-              sudo k3s kubectl logs -n flux-system \
-                deployment/kustomize-controller --tail=40 2>/dev/null || true
-              echo "===== END DIAGNOSTICS ====="
-            }
-            trap 'EC=$?; [[ $EC -ne 0 ]] && dump_diagnostics' EXIT
+  # ── Health Check ───────────────────────────────────────────────────────────
+  # Fast functional assertions: nodes Ready, all 3 Postgres pods Running,
+  # Adminer pod Ready, Adminer HTTP 200 via ingress.
+  # Runs on every deploy — meaningful regardless of whether it was a fresh install.
+  health-check:
+    name: Health Check
+    runs-on: ubuntu-latest
+    needs: wait-for-convergence
+    environment: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+    env:
+      ENVIRONMENT: ${{ github.ref_name == 'main' && 'dev' || github.ref_name }}
+      GCP_PROJECT: ${{ secrets.GCP_PROJECT_ID }}
+    steps:
+      - uses: actions/checkout@v4
 
-            # ── [1/8] Nodes ───────────────────────────────────────────────────
-            echo ""
-            echo "=== [1/8] Nodes ==="
-            $K get nodes -o wide
-            $K wait node --all --for=condition=Ready --timeout=120s
-            echo "✓ All nodes Ready"
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ secrets.GCP_SERVICE_ACCOUNT }}
 
-            # ── [2/8] Flux bootstrap ──────────────────────────────────────────
-            echo ""
-            echo "=== [2/8] Flux kustomizations (waiting to appear) ==="
-            timeout 120 bash -c \
-              'until sudo k3s kubectl get kustomization common -n flux-system &>/dev/null; \
-               do echo "  … Flux not yet started, retrying in 5s"; sleep 5; done'
-            echo "  Current kustomization state:"
-            $K get kustomization -A
+      - name: Write SSH private key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/enclaive-ci
+          chmod 600 ~/.ssh/enclaive-ci
 
-            # ── [3/8] common ─────────────────────────────────────────────────
-            echo ""
-            echo "=== [3/8] common kustomization (ingress-nginx, ESO, CNPG operator) ==="
-            $K wait kustomization/common -n flux-system --for=condition=Ready --timeout=600s
-            echo "  HelmReleases installed:"
-            $K get helmrelease -A
+      - name: Get control plane IP
+        id: cp-ip
+        run: echo "ip=$(bash scripts/ci/get-cp-ip.sh)" >> "$GITHUB_OUTPUT"
 
-            # ── [4/8] eso-config ──────────────────────────────────────────────
-            echo ""
-            echo "=== [4/8] eso-config kustomization (ClusterSecretStore + ExternalSecrets) ==="
-            $K wait kustomization/eso-config -n flux-system --for=condition=Ready --timeout=120s
-            echo "  Syncing secrets from GCP Secret Manager..."
-            for secret in grafana-admin-password pg-superuser-password pg-app-password pg-replication-password; do
-              ns=$( [[ "$secret" == "grafana-admin-password" ]] && echo monitoring || echo postgres )
-              $K wait externalsecret/$secret -n $ns --for=condition=Ready --timeout=60s
-              echo "    ✓ $secret → namespace/$ns"
-            done
-
-            # ── [5/8] postgres kustomization ─────────────────────────────────
-            echo ""
-            echo "=== [5/8] postgres kustomization (Cluster CR, backup, network policies) ==="
-            $K wait kustomization/postgres -n flux-system --for=condition=Ready --timeout=600s
-            echo "✓ Postgres kustomization Ready"
-
-            # ── [6/8] demo-app kustomization ─────────────────────────────────
-            echo ""
-            echo "=== [6/8] demo-app kustomization (Adminer) ==="
-            $K wait kustomization/demo-app -n flux-system --for=condition=Ready --timeout=300s
-            echo "✓ demo-app kustomization Ready"
-
-            # ── [7/8] Postgres cluster ────────────────────────────────────────
-            echo ""
-            echo "=== [7/8] Postgres cluster (3-instance HA, streaming replication) ==="
-            echo "  Polling every 30s — takes 5-15 min on first deploy..."
-            DEADLINE=$((SECONDS + 900))
-            while true; do
-              PHASE=$($K get cluster pg -n postgres \
-                -o jsonpath='{.status.phase}' 2>/dev/null || echo "unknown")
-              READY=$($K get cluster pg -n postgres \
-                -o jsonpath='{.status.readyInstances}' 2>/dev/null || echo "?")
-              TOTAL=$($K get cluster pg -n postgres \
-                -o jsonpath='{.status.instances}' 2>/dev/null || echo "?")
-              REMAINING=$((DEADLINE - SECONDS))
-              echo "  $(date -u +%H:%M:%SZ)  phase=\"${PHASE}\"  instances=${READY}/${TOTAL} ready  (${REMAINING}s remaining)"
-              if $K wait cluster/pg -n postgres --for=condition=Ready --timeout=5s &>/dev/null; then
-                PRIMARY=$($K get cluster pg -n postgres \
-                  -o jsonpath='{.status.targetPrimary}' 2>/dev/null)
-                echo "✓ Cluster Ready — primary: ${PRIMARY}"
-                break
-              fi
-              [[ $REMAINING -le 5 ]] && { echo "TIMEOUT: cluster/pg did not become Ready"; exit 1; }
-              sleep 30
-            done
-            echo "  Pods:"
-            $K get pods -n postgres -o wide
-
-            echo ""
-            echo "  Confirming all 3 instance pods Ready..."
-            $K wait pod/pg-1 pod/pg-2 pod/pg-3 -n postgres \
-              --for=condition=Ready --timeout=120s
-            echo "✓ pg-1, pg-2, pg-3 Ready"
-
-            # ── [8/8] Adminer ─────────────────────────────────────────────────
-            echo ""
-            echo "=== [8/8] Application — Adminer ==="
-            $K wait pods -n demo-app -l app=adminer \
-              --for=condition=Ready --timeout=120s
-            INGRESS_IP=$($K get pod -n ingress-nginx \
-              -l app.kubernetes.io/name=ingress-nginx \
-              -o jsonpath='{.items[0].status.hostIP}')
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 \
-              http://${INGRESS_IP}/adminer)
-            if [[ "$STATUS" != "200" ]]; then
-              echo "Adminer returned HTTP ${STATUS} — expected 200"
-              exit 1
-            fi
-            echo "✓ Adminer reachable at http://${INGRESS_IP}/adminer — HTTP ${STATUS}"
-
-            echo ""
-            echo "✅ All smoke tests passed!"
-          REMOTE
+      - name: Run health checks
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
+            ubuntu@${{ steps.cp-ip.outputs.ip }} \
+            bash < scripts/ci/health-check.sh
