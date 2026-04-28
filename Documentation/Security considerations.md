@@ -12,7 +12,7 @@ This document describes the security posture of the platform: how secrets are ma
 
 **No secret ever enters Git or a CI log.** All credentials flow through a single path:
 
-```
+```text
   Terraform (random_password)
       │  generates at provisioning time
       ▼
@@ -58,7 +58,7 @@ The subnet CIDR is **not** stored as a secret. After `terraform apply` runs, CI 
 
 CI never uses a long-lived service account key. Instead, GitHub Actions authenticates to GCP via **Workload Identity Federation**:
 
-```
+```text
   GitHub Actions job
       │  presents OIDC token (signed by GitHub)
       ▼
@@ -127,6 +127,7 @@ A NetworkPolicy is defined for the Postgres namespace (`gitops/operators/postgre
 > ⚠️ Flannel does not enforce NetworkPolicies natively — the policy is declared but not enforced in the current setup. To enforce it, install a NetworkPolicy-capable CNI alongside Flannel (e.g. Calico in policy-only mode) or switch to a CNI that supports them natively (e.g. Cilium). In k3s, this requires replacing Flannel entirely.
 
 For production, the recommended baseline on top of the existing policy:
+
 - Default-deny all ingress and egress within each namespace
 - Explicit allow: Postgres replicas ↔ primary (streaming replication, port 5432)
 - Explicit allow: ESO → Secret Manager (egress to Google APIs)

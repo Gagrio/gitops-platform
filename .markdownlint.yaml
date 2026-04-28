@@ -1,0 +1,15 @@
+---
+default: true
+
+# Line length — disabled: tables, URLs, and code examples make 80-char limit impractical
+MD013: false
+
+# Duplicate headings — disabled: repeated section titles (e.g. "Summary") are fine
+MD024: false
+
+# Bare URLs — disabled: acceptable in troubleshooting tables and inline notes
+MD034: false
+
+# Table column style — disabled: different editors format table pipes differently;
+# all variants render correctly in GitHub Markdown
+MD060: false

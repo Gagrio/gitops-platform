@@ -47,6 +47,7 @@ You always see what Terraform is going to do before it does it. Apply only runs 
 📦 **Supply chain:** Pin third-party dependencies — Actions, collections, container images — to specific versions. In production, mirror images to a private registry and scan them before use.
 
 > 🔧 For example, in GCP we would:
+>
 > - Restrict the Kubernetes API (6443) to the operator's CIDR via VPC firewall; replace SSH with Cloud IAP tunneling in production
 > - Rely on Google-managed encryption at rest for GCE disks and GCS buckets; store all passwords in Secret Manager and pull them with External Secrets Operator
 > - Harden nodes via Ansible and use Pod Security Admission; in production tighten policies per namespace

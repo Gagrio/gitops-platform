@@ -6,7 +6,7 @@ No one runs `kubectl apply` to deploy things. You open a PR, get it reviewed, me
 
 ## 📁 Structure
 
-```
+```text
 gitops/
   clusters/
     dev/                          ← Flux entry point for the dev cluster
@@ -28,7 +28,7 @@ gitops/
 
 When Flux bootstraps (done by Ansible during the first CI run), it creates a `GitRepository` resource pointing at this repo and a root `Kustomization` pointing at `gitops/clusters/<env>`. From that point it works like this:
 
-```
+```text
 Flux watches gitops/clusters/dev/
     │
     ├── common.yaml    →  reconciles gitops/clusters/common/
@@ -61,6 +61,7 @@ Two ConfigMaps in the `flux-system` namespace supply these variables (created by
 Every Flux Kustomization references both via `postBuild.substituteFrom`. Manifests use `${VARIABLE}` syntax wherever an environment-specific value is needed (e.g. `gs://${ENVIRONMENT}-${GCP_PROJECT_ID}-pg-backups`).
 
 ➕ Adding a new environment (e.g. staging) means:
+
 1. Create `gitops/clusters/staging/` with the three Kustomization files
 2. Point them at the same shared manifest directories
 3. The Ansible bootstrap for that cluster creates the right `cluster-vars` for staging
@@ -97,14 +98,16 @@ Credentials never touch Git. They live in Secret Manager (written there by Terra
 ## ✏️ Making a change
 
 **Application or cluster config change** (anything in `gitops/`):
-```
+
+```text
 edit file → push branch → open PR → merge → Flux picks it up within 60 seconds ⚡
 ```
 
 No CI job runs for GitOps changes. Flux polls the repository every 60 seconds and applies any diff it finds.
 
 **Infrastructure change** (anything in `terraform/` or `ansible/`):
-```
+
+```text
 edit file → push branch → open PR (CI runs terraform plan) → merge → CI applies
 ```
 

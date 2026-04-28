@@ -46,6 +46,7 @@ You need the following tools installed locally:
 Ansible is not needed locally — CI runs it.
 
 You also need:
+
 - A **GCP account** with billing enabled
 - A **GCP project** — create at https://console.cloud.google.com/projectcreate or use an existing one
 
@@ -85,6 +86,7 @@ bash scripts/bootstrap.sh
 ```
 
 What it does:
+
 1. Creates the Terraform state bucket in GCS
 2. Generates an SSH key pair at `~/.ssh/enclaive-ci`
 3. Writes `terraform/bootstrap/terraform.tfvars` (gitignored)
@@ -161,7 +163,8 @@ kubectl get nodes
 ```
 
 Expected output:
-```
+
+```text
 NAME                STATUS   ROLES                  AGE   VERSION
 <env>-node-01      Ready    control-plane,master   5m    v1.32.0+k3s1
 <env>-node-02      Ready    <none>                 4m    v1.32.0+k3s1
@@ -193,25 +196,28 @@ The cluster status should show `Cluster in healthy state`. All three pods (`pg-1
 
 Grafana is exposed through ingress-nginx at the same node IP as Adminer:
 
-```
+```text
 http://<any-node-external-ip>/grafana
 ```
 
 Retrieve the admin password from Secret Manager:
+
 ```bash
 gcloud secrets versions access latest --secret=<environment>-grafana-admin-password
 ```
+
 Log in as **admin** with that password. Navigate to **Dashboards → CloudNativePG** for PostgreSQL metrics.
 
 ### 3.5 🖥️ Access Adminer
 
 Adminer is reachable directly in the browser — no port-forwarding needed. ingress-nginx uses `hostPort` mode, binding ports 80 and 443 directly on the node, so any node's external IP works:
 
-```
+```text
 http://<any-node-external-ip>/adminer
 ```
 
 Get a node IP with:
+
 ```bash
 gcloud compute instances list \
   --project=<your-project-id> \
@@ -220,6 +226,7 @@ gcloud compute instances list \
 ```
 
 Retrieve the app user password from Secret Manager:
+
 ```bash
 gcloud secrets versions access latest \
   --secret=<environment>-pg-app-password \
@@ -268,11 +275,13 @@ You should see two rows (one for each replica) with `state = streaming`. This co
 ## 🗓️ Part 4 — Day-to-Day Operations
 
 **For application or cluster config changes** (anything under `gitops/`):
+
 1. Edit the file
 2. Push to a branch, open a PR
 3. Merge — Flux picks up the change within 60 seconds — no CI run needed
 
 **For infrastructure changes** (anything under `terraform/` or `ansible/`):
+
 1. Edit the file
 2. Push to a branch, open a PR — CI runs `terraform plan` so you can review the impact before merging
 3. Merge — CI runs `terraform apply` and Ansible if needed

@@ -35,7 +35,7 @@ The normal workflow is: **open a PR → merge → CI and Flux handle everything*
 
 ## 📁 Repository Structure
 
-```
+```text
 enclaive-platform-challenge/
 ├── terraform/
 │   ├── bootstrap/              # One-time: CI service account, WIF, GitHub secrets
@@ -148,6 +148,7 @@ Approximate engineering time per sub-task:
 **Claude (claude-sonnet-4-6 via Claude Code)** was used throughout this project as a pair programmer — for code generation, review, debugging, and documentation writing.
 
 Specifically:
+
 - All Terraform, Ansible, and Kubernetes manifests were written with Claude generating first drafts, reviewed and corrected iteratively
 - Claude caught several real bugs during a file-by-file review: `ansible_default_ipv4.address` returning the external GCE IP on multi-homed VMs, `br_netfilter` being loaded after the sysctl settings that depend on it, `hosts: workers` vs `hosts: worker` mismatch
 - CI workflows and the bootstrap script were designed and written collaboratively

@@ -15,6 +15,10 @@ on:
         options:
           - dev
           - prod
+      gitops_branch:
+        description: "Git branch Flux should track (defaults to environment name)"
+        required: false
+        default: ""
   push:
     branches:
       - main   # deploys to dev
@@ -126,7 +130,7 @@ jobs:
             --extra-vars "gcp_project_id=${{ secrets.GCP_PROJECT_ID }} \
                           region=${{ secrets.GCP_REGION }} \
                           cluster_env=${{ env.ENVIRONMENT }} \
-                          gitops_branch=${{ github.ref_name }} \
+                          gitops_branch=${{ github.event_name == 'workflow_dispatch' && (inputs.gitops_branch != '' && inputs.gitops_branch || inputs.environment) || github.ref_name }} \
                           github_owner=${{ github.repository_owner }} \
                           subnet_cidr=${{ needs.terraform-apply.outputs.subnet_cidr }} \
                           storage_class=${{ env.STORAGE_CLASS }} \
