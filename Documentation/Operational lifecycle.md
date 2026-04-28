@@ -159,13 +159,13 @@ Key metrics exposed by CloudNativePG:
 
 The Grafana instance is pre-provisioned with the **official CloudNativePG dashboard** (Grafana ID 20417). No manual dashboard import needed — Flux reconciles it on first deploy.
 
-Access Grafana:
+Access Grafana via ingress-nginx at the same node IP as Adminer:
 
-```bash
-kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring
+```
+http://<any-node-external-ip>/grafana
 ```
 
-Open http://localhost:3000. Retrieve the admin password from Secret Manager:
+Retrieve the admin password from Secret Manager:
 
 ```bash
 gcloud secrets versions access latest --secret=dev-grafana-admin-password

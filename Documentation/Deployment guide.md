@@ -192,11 +192,13 @@ The cluster status should show `Cluster in healthy state`. All three pods (`pg-1
 
 ### 3.4 📊 Access Grafana
 
-```bash
-kubectl port-forward svc/kube-prometheus-stack-grafana 3000:80 -n monitoring
+Grafana is exposed through ingress-nginx at the same node IP as Adminer:
+
+```
+http://<any-node-external-ip>/grafana
 ```
 
-Open http://localhost:3000. Retrieve the Grafana admin password from Secret Manager:
+Retrieve the admin password from Secret Manager:
 ```bash
 gcloud secrets versions access latest --secret=dev-grafana-admin-password
 ```
