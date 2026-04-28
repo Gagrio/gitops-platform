@@ -13,7 +13,7 @@ skip_list:
   # Prefer get_url/uri module over curl. curl is used for binary downloads
   # (k3s installer, Flux CLI) where shell-level control and progress output
   # are needed and the module equivalents are less convenient.
-  - command-instead-of-module[curl]
+  - command-instead-of-module
 
   # Shell tasks with pipes should set pipefail. The tasks that trigger this
   # are wrapped in conditional checks (creates:, when:) that make the pipe
