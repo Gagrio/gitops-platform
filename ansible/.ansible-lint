@@ -30,3 +30,4 @@ skip_list:
   # rule flags the single blank line used as visual separators between plays,
   # which is standard YAML formatting in Ansible playbooks.
   - yaml[empty-lines]
+
