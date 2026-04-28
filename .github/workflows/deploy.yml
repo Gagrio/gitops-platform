@@ -218,7 +218,7 @@ jobs:
             echo "=== Waiting for Postgres Cluster CR ==="
             timeout 60 bash -c \
               'until sudo k3s kubectl get cluster pg -n postgres &>/dev/null; do sleep 5; done'
-            $K wait cluster/pg -n postgres --for=condition=Ready --timeout=300s
+            $K wait cluster/pg -n postgres --for=condition=Ready --timeout=900s
 
             echo "=== Postgres pods ==="
             $K wait pods -n postgres -l cnpg.io/cluster=pg \
