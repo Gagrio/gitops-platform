@@ -1,0 +1,8 @@
+# Every file requires review from the repository owner by default.
+# GitHub automatically requests a review from the matching owner(s) when a PR
+# touches files covered by a rule. The last matching rule wins.
+#
+# For this to be enforced (not just advisory), branch protection must have
+# "Require review from Code Owners" enabled on the target branch.
+
+*                    @Gagrio
