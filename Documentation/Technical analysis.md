@@ -141,9 +141,15 @@ If the primary pod (`pg-1`) fails, CloudNativePG automatically promotes the most
 Two mechanisms run in parallel:
 
 - **WAL archiving** — PostgreSQL continuously ships Write-Ahead Log segments to a GCS bucket. This is the foundation of point-in-time recovery.
-- **Scheduled base backups** — triggers a full base backup via `barman-cloud-backup` daily. Combined with WAL, this allows recovery to any point within the retention window (30 days in dev, 90 in prod).
+- **Scheduled base backups** — a `ScheduledBackup` CR triggers a full base backup daily at 02:00 UTC (`schedule: "0 0 2 * * *"` — CNPG uses a 6-field cron format with seconds as the first field). Combined with WAL, this allows recovery to any point within the 30-day retention window.
 
-**Why `gkeEnvironment: true` for GCS credentials:** the CNPG `Cluster` CR's `backup.barmanObjectStore.googleCredentials.gkeEnvironment` field tells barman-cloud to obtain GCS credentials from the GCE instance metadata server rather than from an explicit service-account key secret. Despite the misleading name (`gke`), this works on any GCE VM — the metadata server is a GCE feature, not a GKE one. The node service account is granted `roles/storage.objectAdmin` on the backup bucket by Terraform, so no credential file or Kubernetes Secret is needed. Setting this to `false` would require creating and mounting an SA key JSON secret, which is operationally heavier and less secure.
+**Why `gkeEnvironment: true` for GCS credentials:** the CNPG `Cluster` CR's `backup.barmanObjectStore.googleCredentials.gkeEnvironment` field tells barman-cloud to use the GCE instance metadata server for credentials rather than an explicit key file. No service-account JSON secret is needed — the node SA is granted IAM permissions on the bucket by Terraform and the metadata server hands credentials to the barman Python library at runtime.
+
+Three configuration details are required to make this work on a plain GCE + k3s cluster (as opposed to GKE, where these are handled automatically):
+
+1. **`GOOGLE_CLOUD_PROJECT` env var** — injected into Postgres pods via `spec.env` in the Cluster CR. The barman Python library authenticates via the metadata server but cannot infer the project ID from the token alone; this env var provides it explicitly.
+2. **CoreDNS hosts entry** — the metadata server is reachable from pods at `169.254.169.254` (a GCE link-local address on the node), but Flannel pods do not inherit the GCE internal DNS that resolves `metadata.google.internal`. The Ansible `flux` role patches the CoreDNS `NodeHosts` ConfigMap to add `169.254.169.254 metadata.google.internal` on every cluster deploy.
+3. **Dual IAM roles on the backup bucket** — barman calls `storage.buckets.get` before archiving to verify the bucket exists. This is not included in `roles/storage.objectAdmin` (which covers objects only). Terraform additionally grants `roles/storage.legacyBucketReader` to the node SA, which adds the `storage.buckets.get` permission without granting any broader bucket management rights.
 
 ### 🔐 Secrets
 
@@ -195,7 +201,7 @@ CloudNativePG exposes PostgreSQL metrics natively via a `PodMonitor` CR that tel
       │  roles/base        → OS packages, kernel params
       │  roles/security    → SSH hardening, fail2ban, UFW
       │  roles/kubernetes  → k3s install, cluster join
-      │  roles/flux        → Flux install, GitRepository CR, Kustomization CR
+      │  roles/flux        → Flux install, GitRepository CR, Kustomization CR, CoreDNS metadata patch
       ▼
   Flux reconciles clusters/common/
       │  installs: ingress-nginx, ESO, CNPG operator (HelmReleases only)

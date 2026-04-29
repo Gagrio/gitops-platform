@@ -195,10 +195,10 @@ The cluster status should show `Cluster in healthy state`. All three pods (`pg-1
 
 ### 3.4 📊 Access Grafana
 
-Grafana is exposed through ingress-nginx at the same node IP as Adminer:
+Grafana is exposed through ingress-nginx at the same node IP as Adminer (use the node where `kubectl get pod -n ingress-nginx -o wide` shows the pod running):
 
 ```text
-http://<any-node-external-ip>/grafana
+http://<ingress-node-external-ip>/grafana
 ```
 
 Retrieve the admin password from Secret Manager:
@@ -211,13 +211,19 @@ Log in as **admin** with that password. Navigate to **Dashboards → CloudNative
 
 ### 3.5 🖥️ Access Adminer
 
-Adminer is reachable directly in the browser — no port-forwarding needed. ingress-nginx uses `hostPort` mode, binding ports 80 and 443 directly on the node, so any node's external IP works:
+Adminer is reachable directly in the browser — no port-forwarding needed. ingress-nginx uses `hostPort` mode, binding ports 80 and 443 on whichever node(s) its pod is scheduled on. First check which node has the pod:
 
-```text
-http://<any-node-external-ip>/adminer
+```bash
+kubectl get pod -n ingress-nginx -o wide
 ```
 
-Get a node IP with:
+Then use the external IP of that node:
+
+```text
+http://<ingress-node-external-ip>/adminer
+```
+
+Get the node's external IP with:
 
 ```bash
 gcloud compute instances list \
@@ -323,7 +329,10 @@ The bootstrap state lives in the same GCS bucket under the `bootstrap` prefix an
 | `monitoring` kustomization slow | kube-prometheus-stack can take 15 min | Normal — it runs in parallel and doesn't block the app. Check: `kubectl get helmrelease -n monitoring` |
 | Flux GitRepository shows "Invalid username or token" | `FLUX_GITHUB_TOKEN` secret missing or expired | Regenerate the PAT and re-set the secret: `gh secret set FLUX_GITHUB_TOKEN`; update the in-cluster secret with `kubectl patch secret flux-system -n flux-system` |
 | CNPG Cluster CR rejected by webhook | `gkeEnvironment: false` requires an explicit SA key secret | Cluster CR uses `gkeEnvironment: true` — the node SA accesses GCS via the metadata server; no key file needed |
-| Adminer not reachable in browser | ingress-nginx pod not on that node | Try a different node IP; check which nodes have the pod: `kubectl get pod -n ingress-nginx -o wide` |
+| WAL archiving fails: `Project was not passed` | `GOOGLE_CLOUD_PROJECT` env var not set in Postgres pods | Verify the Cluster CR has `spec.env: [{name: GOOGLE_CLOUD_PROJECT, value: ...}]` and that Flux has reconciled it |
+| WAL archiving fails: `metadata.google.internal` unreachable | CoreDNS not patched — Flannel pods cannot resolve GCE internal DNS hostnames | Check `kubectl get configmap coredns -n kube-system -o yaml` contains `169.254.169.254 metadata.google.internal` in `NodeHosts`; if missing, re-run Ansible or patch manually |
+| WAL archiving fails: `403 storage.buckets.get access denied` | Node SA missing `roles/storage.legacyBucketReader` on the backup bucket | Run `terraform apply` — the gcs module now grants both `objectAdmin` and `legacyBucketReader`; or add the role manually via `gcloud storage buckets add-iam-policy-binding` |
+| Adminer not reachable in browser | ingress-nginx pod not on that node | Check which nodes have the pod: `kubectl get pod -n ingress-nginx -o wide`; use that node's external IP |
 | kubectl connection refused or times out | API server port (6443) firewalled | Confirm your current IP matches `ADMIN_CIDR` used during bootstrap |
 | kubeconfig artifact empty | scp step failed | SSH to control plane manually: `scp ubuntu@<cp-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/config-enclaive-<environment>` |
 | Cannot retrieve app password | Secret Manager access | Run `gcloud secrets versions access latest --secret=<environment>-pg-app-password` |

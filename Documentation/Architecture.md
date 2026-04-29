@@ -167,7 +167,7 @@ Upgrading Postgres is a Git operation. The operator handles the rolling restart 
 
 ## 🌐 Ingress and Load Balancing
 
-External traffic reaches the cluster through **ingress-nginx**, which is exposed via a Service of type `LoadBalancer`. On this platform, k3s's built-in **ServiceLB** (klipper-lb) handles that Service — it binds ports 80 and 443 directly on every node, so any node's external IP can receive traffic.
+External traffic reaches the cluster through **ingress-nginx**, which is exposed via a Service of type `LoadBalancer`. On this platform, k3s's built-in **ServiceLB** (klipper-lb) handles that Service — it binds ports 80 and 443 directly on the nodes where the ingress-nginx pod is scheduled. Use `kubectl get pod -n ingress-nginx -o wide` to find which node(s) are currently hosting the pod before attempting to access services in the browser.
 
 ```text
 External client → node external IP (port 80/443) → k3s ServiceLB → ingress-nginx → application
@@ -204,7 +204,7 @@ Two mechanisms run in parallel to protect your data. WAL archiving gives you con
 ```text
   BACKUP
   ──────
-  ScheduledBackup CR  (e.g. daily 02:00 UTC)
+  ScheduledBackup CR  (daily 02:00 UTC — 6-field cron: "0 0 2 * * *")
   ├── WAL streaming  ─────────────────────────► GCS bucket
   └── base backup (barman-cloud-backup) ───────► GCS bucket
 

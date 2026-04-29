@@ -56,6 +56,10 @@ The subnet CIDR is **not** stored as a secret. After `terraform apply` runs, CI 
 
 ## 👤 Access Control
 
+### 🔒 Terraform state locking
+
+Terraform state is stored in GCS. GCS implements locking natively via object preconditions (an `If-Match` ETag check on the lock file) — no DynamoDB table or separate resource is needed. If two deployments run concurrently and race for the lock, the losing run fails with a `412 Precondition Failed` error and exits cleanly without corrupting state. Re-triggering the failed run after the first completes is sufficient to recover.
+
 ### ☁️ GCP access from CI (Workload Identity Federation)
 
 CI never uses a long-lived service account key. Instead, GitHub Actions authenticates to GCP via **Workload Identity Federation**:
@@ -82,6 +86,15 @@ The bootstrap Terraform module sets this up automatically. The CI service accoun
 | `storage.objects.*` | Read/write Terraform state and backups |
 | `secretmanager.versions.access` | Read secrets for ESO |
 | `iam.serviceAccounts.actAs` | Required for WIF impersonation |
+
+**Node SA — GCS backup bucket permissions:** the node service account (`{env}-k8s-nodes`) needs two IAM roles on the backup bucket:
+
+| Role | Why |
+|---|---|
+| `roles/storage.objectAdmin` | Create, list, get, and delete WAL segments and base backup objects |
+| `roles/storage.legacyBucketReader` | `storage.buckets.get` — barman-cloud verifies the bucket exists before archiving; this permission is not included in `objectAdmin` |
+
+Both are granted by the `gcs` Terraform module. Setting only `objectAdmin` results in a `403 storage.buckets.get access denied` error on every WAL archive attempt.
 
 ### 🔒 Cluster access (kubectl)
 
