@@ -36,6 +36,7 @@ Passwords are treated as infrastructure: generated once at `terraform apply` tim
 |---|---|---|
 | `{env}-pg-app-password` | Terraform `random_password` | ESO → CloudNativePG |
 | `{env}-pg-superuser-password` | Terraform `random_password` | ESO → CloudNativePG |
+| `{env}-pg-replication-password` | Terraform `random_password` | ESO → CloudNativePG |
 | `{env}-grafana-admin-password` | Terraform `random_password` | ESO → Grafana (via `valuesFrom`) |
 
 The `{env}` prefix matches the environment name (`dev` or `prod`). Each environment's Terraform creates its own set of secrets. ESO uses `${ENVIRONMENT}` as a Flux substitution variable to reference the right secret at runtime.

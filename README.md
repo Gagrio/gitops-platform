@@ -47,7 +47,7 @@ enclaive-platform-challenge/
 │   │   └── iam/                # Service accounts, Secret Manager, WIF bindings
 │   └── environments/
 │       ├── dev/                # dev entry point (e2-standard-2, local-path storage)
-│       └── prod/               # prod entry point (n2-standard-4, GCE PD storage)
+│       └── prod/               # prod entry point (e2-standard-4, local-path storage)
 │
 ├── ansible/
 │   ├── playbooks/bootstrap.yml # Single idempotent playbook — runs all four roles

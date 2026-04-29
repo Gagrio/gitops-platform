@@ -136,19 +136,9 @@ Every change to the cluster goes through Git — no one runs `kubectl apply` by 
 
 ## ⬆️ PostgreSQL Minor Upgrade Flow
 
-Upgrading Postgres is a Git operation. The operator handles the rolling restart with zero downtime — replicas restart first, then the primary fails over to a healthy replica before restarting itself:
+Upgrading Postgres is a Git operation — bump `imageName` in the `Cluster` CR and merge. CloudNativePG performs a rolling restart: replicas first, then the primary fails over before restarting. Zero downtime throughout.
 
-```text
-  1. Engineer bumps imageName in Cluster CR and opens PR
-  2. PR reviewed and merged to main
-  3. Flux detects diff, reconciles Cluster CR to cluster
-  4. CloudNativePG operator detects image change
-  5. Rolling restart begins:
-        replica pg-3  →  restart  →  healthy
-        replica pg-2  →  restart  →  healthy
-        primary pg-1  →  failover to pg-2  →  restart  →  rejoin as replica
-  6. Zero downtime — replicas serve reads throughout
-```
+See **Operational lifecycle.md → Upgrades** for the full step-by-step flow and the major-version upgrade caveat.
 
 ---
 
@@ -199,24 +189,6 @@ The storage layer does not need to be durable because the database layer already
 
 ## 💾 Backup and Restore
 
-Two mechanisms run in parallel to protect your data. WAL archiving gives you continuous coverage; base backups give you a faster restore starting point:
+Two mechanisms run in parallel: continuous WAL archiving to GCS (every transaction) and a daily base backup via `barman-cloud-backup` at 02:00 UTC. Together they enable point-in-time recovery to any moment since the last `terraform apply`.
 
-```text
-  BACKUP
-  ──────
-  ScheduledBackup CR  (daily 02:00 UTC — 6-field cron: "0 0 2 * * *")
-  ├── WAL streaming  ─────────────────────────► GCS bucket
-  └── base backup (barman-cloud-backup) ───────► GCS bucket
-
-  RESTORE
-  ───────
-  1. Create new Cluster CR with:
-         bootstrap:
-           recovery:
-             source: cluster-backup
-             recoveryTarget:
-               targetTime: "2026-03-15T03:00:00Z"
-  2. CloudNativePG pulls base backup from GCS
-  3. CloudNativePG replays WAL up to target time
-  4. Cluster comes online at point-in-time
-```
+See **Operational lifecycle.md → Database Backup / Database Restore** for retention settings, the full restore Cluster CR, and step-by-step recovery procedure.

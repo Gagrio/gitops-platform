@@ -22,7 +22,7 @@ The `ScheduledBackup` CR triggers a full base backup via `barman-cloud-backup` e
 
 ```yaml
 # gitops/operators/postgres/scheduled-backup.yaml
-schedule: "0 2 * * *"   # daily at 02:00 UTC
+schedule: "0 0 2 * * *"   # daily at 02:00 UTC (6-field: seconds minutes hours ...)
 ```
 
 ### 🗂️ Retention
@@ -159,10 +159,10 @@ Key metrics exposed by CloudNativePG:
 
 The Grafana instance is pre-provisioned with the **official CloudNativePG dashboard** (Grafana ID 20417). No manual dashboard import needed — Flux reconciles it on first deploy.
 
-Access Grafana via ingress-nginx at the same node IP as Adminer:
+Access Grafana via ingress-nginx at the same node IP as Adminer (use `kubectl get pod -n ingress-nginx -o wide` to find which node has the pod):
 
 ```text
-http://<any-node-external-ip>/grafana
+http://<ingress-node-external-ip>/grafana
 ```
 
 Retrieve the admin password from Secret Manager:
