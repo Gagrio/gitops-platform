@@ -15,7 +15,7 @@ A **GitOps-driven infrastructure platform** that provisions a Kubernetes cluster
 | Demo app | Adminer | Database UI — exercises the full Postgres connection end-to-end |
 | Observability | Prometheus + Grafana | CloudNativePG metrics, Grafana dashboard provisioned automatically |
 | Secrets | External Secrets Operator | Pulls credentials from GCP Secret Manager — nothing sensitive in Git |
-| CI | GitHub Actions (3 workflows) | Validate on PR, apply on merge, smoke test after bootstrap |
+| CI | GitHub Actions (4 workflows) | Validate on PR, apply on merge, post-deploy health checks |
 
 ---
 
@@ -61,19 +61,29 @@ enclaive-platform-challenge/
 │
 ├── gitops/
 │   ├── clusters/
+│   │   ├── common/             # Shared platform: ingress-nginx, ESO, Prometheus stack
 │   │   ├── dev/                # Dev entry point — Flux root for the dev cluster
 │   │   └── prod/               # Prod entry point — same manifests, different vars
-│   │   ├── common/             # Shared platform: ingress-nginx, ESO, Prometheus stack
-│   ├── operators/postgres/     # CloudNativePG Cluster CR, ScheduledBackup, ExternalSecrets
+│   ├── operators/
+│   │   ├── eso-config/         # ClusterSecretStore and ExternalSecret CRs
+│   │   ├── monitoring/         # kube-prometheus-stack HelmRelease
+│   │   └── postgres/           # CloudNativePG Cluster CR, ScheduledBackup, NetworkPolicy
 │   └── applications/demo-app/  # Adminer Deployment, Service, Ingress
 │
 ├── .github/workflows/
 │   ├── repo-checks.yml         # All PRs: secret scan, YAML lint, Markdown lint
 │   ├── validate.yml            # terraform plan, ansible-lint, kubeconform
-│   └── deploy.yml              # terraform apply → ansible bootstrap → smoke test
+│   ├── deploy.yml              # terraform apply → Ansible bootstrap → kubeconfig upload
+│   └── post-deploy-checks.yml  # Flux convergence wait + functional health checks
 │
 ├── scripts/
-│   └── bootstrap.sh            # Automates the one-time setup — run once, CI takes over
+│   ├── bootstrap.sh            # Automates the one-time setup — run once, CI takes over
+│   └── ci/                     # Helper scripts used by GitHub Actions
+│       ├── get-node-ips.sh     # Returns node external IPs filtered by GCP labels
+│       ├── wait-for-ssh.sh     # Polls until SSH is available on a new node
+│       ├── wait-for-convergence.sh  # Waits for Flux kustomizations and Postgres to settle
+│       ├── health-check.sh     # Nodes, pods, and Adminer HTTP 200 assertions
+│       └── fetch-kubeconfig.sh # Copies kubeconfig from control plane for CI artifact upload
 │
 └── Documentation/
     ├── Architecture.md                # Platform diagram, CI design, GitOps flow, storage, backups

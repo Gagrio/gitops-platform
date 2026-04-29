@@ -11,9 +11,11 @@
 │   │   ├── network      │   ├── base       │   ├── dev/        ├── Operations     │
 │   │   ├── node         │   ├── kubernetes │   └── prod/       └── Security       │
 │   │   └── firewall     │   └── security   ├── operators/                        │
-│   └── environments/    └── playbooks/     │   └── postgres/                     │
-│       ├── dev/             bootstrap.yml  └── applications/                     │
-│       └── prod/                               └── demo-app/                     │
+│   └── environments/    └── playbooks/     │   ├── eso-config/                   │
+│       ├── dev/             bootstrap.yml  │   ├── monitoring/                   │
+│       └── prod/                           │   └── postgres/                     │
+│                                           └── applications/                     │
+│                                               └── demo-app/                     │
 └───────────────┬──────────────────────┬──────────────────────────────────────────┘
                 │                      │
         terraform apply        ansible-playbook bootstrap.yml
@@ -89,7 +91,7 @@
 
 ## 🔁 CI Pipeline Design
 
-Three GitHub Actions workflows cover the full repository:
+Four GitHub Actions workflows cover the full repository:
 
 | Workflow | Trigger | Path filter | Purpose |
 |----------|---------|-------------|---------|
