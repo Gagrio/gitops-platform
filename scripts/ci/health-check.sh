@@ -45,15 +45,20 @@ echo "✓ Adminer pod Ready"
 # ── [4/4] Adminer HTTP endpoint ───────────────────────────────────────────────
 echo ""
 echo "=== [4/4] Adminer HTTP endpoint ==="
-INGRESS_IP=$(echo "$NODE_IPS" | awk '{print $1}')
-echo "  Sending GET http://${INGRESS_IP}/adminer ..."
-STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 \
-  http://"${INGRESS_IP}"/adminer)
-if [[ "$STATUS" != "200" ]]; then
-  echo "  FAIL: Adminer returned HTTP ${STATUS} — expected 200"
+INGRESS_IP=""
+for IP in $NODE_IPS; do
+  echo "  Trying http://${IP}/adminer ..."
+  STATUS=$(curl -s -o /dev/null -w "%{http_code}" -L --max-time 10 "http://${IP}/adminer" || true)
+  if [[ "$STATUS" == "200" ]]; then
+    INGRESS_IP="$IP"
+    break
+  fi
+done
+if [[ -z "$INGRESS_IP" ]]; then
+  echo "  FAIL: Adminer not reachable on any node IP (tried: $NODE_IPS)"
   exit 1
 fi
-echo "✓ Adminer reachable — HTTP ${STATUS}"
+echo "✓ Adminer reachable at http://${INGRESS_IP}/adminer — HTTP 200"
 
 echo ""
 echo "✅ All health checks passed!"
@@ -65,13 +70,11 @@ echo "=================================================="
 echo "  PLATFORM ACCESS"
 echo "=================================================="
 echo ""
-echo "  All node IPs are interchangeable — ServiceLB forwards traffic"
-echo "  from any node to the same ingress-nginx backend."
+echo "  ingress-nginx is bound on the node(s) where its pod is scheduled."
+echo "  Use the IP below for both Adminer and Grafana."
 echo ""
 echo "  Adminer (Database UI)"
-for IP in $NODE_IPS; do
-  echo "  http://${IP}/adminer"
-done
+echo "  http://${INGRESS_IP}/adminer"
 echo "  System:   PostgreSQL"
 echo "  Server:   pg-rw.postgres.svc.cluster.local"
 echo "  Username: app"
@@ -79,9 +82,7 @@ echo "  Database: app"
 echo "  Password: gcloud secrets versions access latest --secret=${ENV}-pg-app-password"
 echo ""
 echo "  Grafana (Monitoring)"
-for IP in $NODE_IPS; do
-  echo "  http://${IP}/grafana"
-done
+echo "  http://${INGRESS_IP}/grafana"
 echo "  Username: admin"
 echo "  Password: gcloud secrets versions access latest --secret=${ENV}-grafana-admin-password"
 echo "=================================================="

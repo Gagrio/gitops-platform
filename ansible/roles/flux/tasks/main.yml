@@ -108,12 +108,8 @@
       echo "already present, skipping"
       exit 0
     fi
-    echo "$CM" | python3 -c "
-import sys, json
-cm = json.load(sys.stdin)
-cm['data']['NodeHosts'] = cm['data']['NodeHosts'].rstrip() + '\n169.254.169.254 metadata.google.internal\n'
-print(json.dumps(cm))
-" | kubectl --kubeconfig={{ kubeconfig_path }} apply -f -
+    UPDATED=$(echo "$CM" | python3 -c 'import sys,json; cm=json.load(sys.stdin); cm["data"]["NodeHosts"]=cm["data"]["NodeHosts"].rstrip()+"\n169.254.169.254 metadata.google.internal\n"; print(json.dumps(cm))')
+    echo "$UPDATED" | kubectl --kubeconfig={{ kubeconfig_path }} apply -f -
   changed_when: true
 
 - name: Ensure kubeconfig is world-readable for scp fetch
