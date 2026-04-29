@@ -28,9 +28,17 @@ resource "google_storage_bucket" "backup" {
   }
 }
 
-# Grant the node service account write access to the backup bucket
+# Grant the node SA full object access (create, delete, list, get) for WAL archiving and backups
 resource "google_storage_bucket_iam_member" "backup_writer" {
   bucket = google_storage_bucket.backup.name
   role   = "roles/storage.objectAdmin"
+  member = "serviceAccount:${var.service_account_email}"
+}
+
+# barman-cloud calls storage.buckets.get to verify the bucket before archiving;
+# storage.objectAdmin does not include bucket-level permissions so this is required separately.
+resource "google_storage_bucket_iam_member" "backup_bucket_reader" {
+  bucket = google_storage_bucket.backup.name
+  role   = "roles/storage.legacyBucketReader"
   member = "serviceAccount:${var.service_account_email}"
 }

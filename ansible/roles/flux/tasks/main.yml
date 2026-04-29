@@ -98,6 +98,24 @@
       STORAGE_CLASS: "{{ storage_class }}"
     EOF
 
+# Patch CoreDNS to resolve metadata.google.internal → 169.254.169.254
+# Required for barman-cloud (Python) to authenticate via the GCE metadata server from inside pods.
+# Flannel pods can reach 169.254.169.254 directly but CoreDNS has no entry for the hostname.
+- name: Add metadata.google.internal to CoreDNS NodeHosts
+  ansible.builtin.shell: |
+    CM=$(kubectl --kubeconfig={{ kubeconfig_path }} get configmap coredns -n kube-system -o json)
+    if echo "$CM" | grep -q 'metadata.google.internal'; then
+      echo "already present, skipping"
+      exit 0
+    fi
+    echo "$CM" | python3 -c "
+import sys, json
+cm = json.load(sys.stdin)
+cm['data']['NodeHosts'] = cm['data']['NodeHosts'].rstrip() + '\n169.254.169.254 metadata.google.internal\n'
+print(json.dumps(cm))
+" | kubectl --kubeconfig={{ kubeconfig_path }} apply -f -
+  changed_when: true
+
 - name: Ensure kubeconfig is world-readable for scp fetch
   ansible.builtin.file:
     path: "{{ kubeconfig_path }}"
