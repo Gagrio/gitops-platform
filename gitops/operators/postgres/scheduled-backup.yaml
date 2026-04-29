@@ -8,7 +8,7 @@ metadata:
   name: pg-scheduled-backup
   namespace: postgres
 spec:
-  schedule: "0 2 * * *"        # daily at 02:00 UTC
+  schedule: "0 0 2 * * *"      # daily at 02:00 UTC (6-field: sec min hour dom mon dow)
   backupOwnerReference: self    # backup object is owned by this ScheduledBackup, cleaned up with it
   cluster:
     name: pg

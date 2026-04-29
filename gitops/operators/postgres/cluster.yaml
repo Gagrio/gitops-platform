@@ -49,6 +49,12 @@ spec:
     storageClass: "${STORAGE_CLASS}"
 
   # GCS backups — uses the node SA (attached to GCE instances) for authentication
+  # GOOGLE_CLOUD_PROJECT is injected below so barman-cloud's Python library can resolve
+  # the project ID from the GCE metadata server on non-GKE clusters.
+  env:
+    - name: GOOGLE_CLOUD_PROJECT
+      value: "${GCP_PROJECT_ID}"
+
   backup:
     barmanObjectStore:
       destinationPath: "gs://${ENVIRONMENT}-${GCP_PROJECT_ID}-pg-backups"
