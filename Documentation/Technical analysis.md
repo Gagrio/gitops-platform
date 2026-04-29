@@ -187,7 +187,7 @@ CloudNativePG exposes PostgreSQL metrics natively via a `PodMonitor` CR that tel
 
 **Why `podMonitorSelectorNilUsesHelmValues: false` is set in the Prometheus spec:** By default, kube-prometheus-stack sets an empty `podMonitorSelector: {}` which it then replaces with `{matchLabels: {release: kube-prometheus-stack}}` — this is what `NilUsesHelmValues: true` (the default) does. The CNPG `PodMonitor` is created in the `postgres` namespace and does not carry that label, so Prometheus would silently ignore it. Setting `NilUsesHelmValues: false` makes the empty selector mean "match everything across all namespaces", which is the expected behaviour.
 
-**Grafana is accessed via ingress-nginx** at `http://<any-node-ip>/grafana` — no port-forwarding needed. The `serve_from_sub_path` option in `grafana.ini` is required for sub-path serving to work correctly; without it relative asset paths break.
+**Grafana is accessed via ingress-nginx** at `http://<ingress-node-ip>/grafana` — no port-forwarding needed. Use `kubectl get pod -n ingress-nginx -o wide` to find which node has the pod. The `serve_from_sub_path` option in `grafana.ini` is required for sub-path serving to work correctly; without it relative asset paths break.
 
 ---
 
@@ -229,7 +229,7 @@ Each layer depends on the one above it. Rebuild from scratch? Work top to bottom
 
 ## 🚦 CI Pipeline
 
-Three workflows cover the full repository. Flux handles everything after the deploy workflow autonomously.
+Four workflows cover the full repository. Flux handles everything after the deploy workflow autonomously.
 
 ```text
   PR opened
@@ -259,9 +259,9 @@ Three workflows cover the full repository. Flux handles everything after the dep
       │         roles/kubernetes (k3s)
       │         roles/flux       (Flux install + bootstrap)
       │
-  deploy.yml ends here. post-deploy.yml triggers automatically on success. 🔄
+  deploy.yml ends here. post-deploy-checks.yml triggers automatically on success. 🔄
 
-  post-deploy.yml (Post-Deploy Verification)
+  post-deploy-checks.yml (Post-Deploy Verification)
       │
       ├── Job: wait-for-convergence (SSH into control plane)
       │         polls kustomization/common Ready (≤10 min, prints Flux status every 15s)

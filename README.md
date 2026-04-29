@@ -82,8 +82,9 @@ enclaive-platform-challenge/
 │       ├── get-node-ips.sh     # Returns node external IPs filtered by GCP labels
 │       ├── wait-for-ssh.sh     # Polls until SSH is available on a new node
 │       ├── wait-for-convergence.sh  # Waits for Flux kustomizations and Postgres to settle
-│       ├── health-check.sh     # Nodes, pods, and Adminer HTTP 200 assertions
-│       └── fetch-kubeconfig.sh # Copies kubeconfig from control plane for CI artifact upload
+│       ├── health-check.sh          # Nodes, pods, and Adminer HTTP 200 assertions
+│       ├── fetch-kubeconfig.sh      # Copies kubeconfig from control plane for CI artifact upload
+│       └── generate-inventory.sh    # Legacy static inventory helper (superseded by gcp_compute plugin)
 │
 └── Documentation/
     ├── Architecture.md                # Platform diagram, CI design, GitOps flow, storage, backups

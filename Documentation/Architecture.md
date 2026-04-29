@@ -39,7 +39,7 @@
 │   └──────┬──────┘   └──────┬──────┘   └──────┬──────┘   │
 │          └─────────────────┴─────────────────┘          │
 │                        Flannel CNI                       │
-│                   NetworkPolicies enforced               │
+│                   NetworkPolicies declared*              │
 │                                                          │
 │   VPC Firewall: 22 (SSH)  6443 (API)  80/443 (ingress)   │
 └───────────────────────────┬──────────────────────────────┘
@@ -84,6 +84,8 @@
 
    GCS Bucket  ◄── CloudNativePG barman-cloud-backup (WAL + base backups)
 ```
+
+> *NetworkPolicies are declared in `gitops/operators/postgres/network-policies.yaml` but Flannel does not enforce them natively. The policy is in place for when a NetworkPolicy-capable CNI is added. See Security considerations.md for details.
 
 > 📝 **Demo application note:** The example application is **Adminer** — a lightweight database UI that connects to Postgres and can read and write data interactively. The task suggests a containerized REST API as one possible example; Adminer was chosen instead because it requires zero application code, directly exercises database authentication and network connectivity, and makes the end-to-end verification immediately visual. In a real platform, this slot would be replaced by a customer workload.
 
