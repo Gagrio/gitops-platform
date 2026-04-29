@@ -161,10 +161,10 @@ See **Operational lifecycle.md → Upgrades** for the full step-by-step flow and
 
 ## 🌐 Ingress and Load Balancing
 
-External traffic reaches the cluster through **ingress-nginx**, which is exposed via a Service of type `LoadBalancer`. On this platform, k3s's built-in **ServiceLB** (klipper-lb) handles that Service — it binds ports 80 and 443 directly on the nodes where the ingress-nginx pod is scheduled. Use `kubectl get pod -n ingress-nginx -o wide` to find which node(s) are currently hosting the pod before attempting to access services in the browser.
+External traffic reaches the cluster through **ingress-nginx**. ServiceLB (klipper-lb) is disabled in this k3s configuration — ingress-nginx instead uses **hostPort** mode, binding ports 80 and 443 directly to the network interface of whichever node(s) its pods are scheduled on. Use `kubectl get pod -n ingress-nginx -o wide` to find which node(s) are currently hosting the pods before attempting to access services in the browser.
 
 ```text
-External client → node external IP (port 80/443) → k3s ServiceLB → ingress-nginx → application
+External client → node external IP (port 80/443) → ingress-nginx pod (hostPort) → application
 ```
 
 > 💰 A proper production setup would sit a **GCE L4 load balancer** in front of the nodes, giving you a single stable public IP and automatic failover if a node goes down. We deliberately skip this here to keep infrastructure costs to a minimum — this is a demo platform, not a customer-facing service.

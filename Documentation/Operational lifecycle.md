@@ -27,12 +27,12 @@ schedule: "0 0 2 * * *"   # daily at 02:00 UTC (6-field: seconds minutes hours .
 
 ### 🗂️ Retention
 
-| Environment | WAL retention | Base backup retention |
+| Environment | Barman retention | GCS object lifecycle |
 |---|---|---|
 | dev | 30 days | 30 days |
-| prod | 30 days | 30 days |
+| prod | 30 days | 90 days |
 
-Both are configured in the `Cluster` CR under `backup.barmanObjectStore.retentionPolicy`.
+Barman retention is configured in the `Cluster` CR under `backup.barmanObjectStore.retentionPolicy` — barman actively deletes backups beyond this window. The GCS object lifecycle (set in the `gcs` Terraform module) is an independent infrastructure-level safety net: even if barman fails to clean up, GCS auto-deletes objects after the lifecycle period. Prod's longer GCS window provides extra recovery headroom without changing barman's behaviour.
 
 ---
 

@@ -167,9 +167,9 @@ Expected output:
 
 ```text
 NAME                STATUS   ROLES                  AGE   VERSION
-<env>-node-01      Ready    control-plane,master   5m    v1.32.0+k3s1
-<env>-node-02      Ready    <none>                 4m    v1.32.0+k3s1
-<env>-node-03      Ready    <none>                 4m    v1.32.0+k3s1
+<env>-node-01      Ready    control-plane,master   5m    v1.35.3+k3s1
+<env>-node-02      Ready    <none>                 4m    v1.35.3+k3s1
+<env>-node-03      Ready    <none>                 4m    v1.35.3+k3s1
 ```
 
 ### 3.2 🔄 Watch Flux Reconcile
