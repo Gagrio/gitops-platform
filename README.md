@@ -94,7 +94,7 @@ See [Architecture → CI Pipeline Design](Documentation/Architecture.md#-ci-pipe
     ├── Security considerations.md     # Secret management, access control, network policies
     ├── Deployment guide.md            # Step-by-step: bootstrap → deploy → verify → day-2
     ├── Technical analysis.md          # Deep dive: every component and every design decision
-    └── Future Enhancements.md         # Improvements for a production-grade deployment
+    └── Future enhancements.md         # Improvements for a production-grade deployment
 ```
 
 ---
@@ -132,7 +132,7 @@ Full instructions: [Deployment Guide](Documentation/Deployment%20guide.md)
 | [Security Considerations](Documentation/Security%20considerations.md) | Secret management, access control, network policies |
 | [Deployment Guide](Documentation/Deployment%20guide.md) | Bootstrap, deploy, verify, day-2 operations, teardown, troubleshooting |
 | [Technical Analysis](Documentation/Technical%20analysis.md) | Design rationale for every component and every decision made |
-| [Future Enhancements](Documentation/Future%20Enhancements.md) | What would change for a fully production-hardened deployment |
+| [Future enhancements](Documentation/Future%20enhancements.md) | What would change for a fully production-hardened deployment |
 
 ---
 

@@ -1,4 +1,4 @@
-# Future Enhancements
+# Future enhancements
 
 This document captures improvements that would be made for a fully production-hardened deployment. The current platform is intentionally scoped as a functional demo — everything here represents deliberate trade-offs, not oversights.
 
