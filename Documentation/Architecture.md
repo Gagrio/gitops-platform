@@ -127,12 +127,12 @@ Every change to the cluster goes through Git — no one runs `kubectl apply` by 
   Engineer              GitHub             flux-system            Cluster
      │                     │                    │                    │
      ├── git push ─────────►                    │                    │
-     │                     ├── PR / review       │                    │
+     │                     ├── PR / review      │                    │
      │◄── merge approved ──┤                    │                    │
      │                     │◄── poll (60s) ─────┤                    │
      │                     ├── diff detected ───►                    │
      │                     │                    ├── reconcile ───────►
-     │                     │                    │◄── ready ──────────
+     │                     │                    │◄── ready ───────────
      │                     │                    │                    │
 ```
 
