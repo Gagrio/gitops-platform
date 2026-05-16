@@ -1,10 +1,10 @@
-# 🚀 Enclaive Lead Infrastructure Engineer — Platform Challenge
+# Kubernetes GitOps Platform
 
-A **GitOps-driven infrastructure platform** that provisions a Kubernetes cluster on Google Cloud, bootstraps it with Ansible, and manages all workloads through Flux. The end state is a platform where no one manually applies Kubernetes manifests — everything is declared in Git and reconciled automatically.
+A **production-grade GitOps infrastructure platform** that provisions a Kubernetes cluster on Google Cloud, bootstraps it with Ansible, and manages all workloads through Flux. The end state is a platform where no one manually applies Kubernetes manifests — everything is declared in Git and reconciled automatically.
 
 ---
 
-## 🧱 What It Builds
+## What It Builds
 
 | Layer | Technology | What it does |
 |---|---|---|
@@ -19,7 +19,7 @@ A **GitOps-driven infrastructure platform** that provisions a Kubernetes cluster
 
 ---
 
-## 🗺️ How It Works
+## How It Works
 
 Three tiers of automation. After the one-time bootstrap you never touch Terraform or Ansible again:
 
@@ -29,14 +29,14 @@ Three tiers of automation. After the one-time bootstrap you never touch Terrafor
 | **Infrastructure changes** | GitHub Actions | Push to `main` → deploys dev; push to `prod` → deploys prod |
 | **Application/config changes** | Flux | Every 60 seconds, continuously |
 
-The normal workflow is: **open a PR → merge → CI and Flux handle everything**. 🙌
+The normal workflow is: **open a PR → merge → CI and Flux handle everything**.
 
 ---
 
-## 📁 Repository Structure
+## Repository Structure
 
 ```text
-enclaive-platform-challenge/
+.
 ├── terraform/
 │   ├── bootstrap/              # One-time: CI service account, WIF, GitHub secrets
 │   ├── modules/
@@ -79,8 +79,8 @@ enclaive-platform-challenge/
 ├── scripts/
 │   ├── bootstrap.sh            # Automates the one-time setup — run once, CI takes over
 │   └── ci/                     # Helper scripts used by GitHub Actions
-│       ├── get-node-ips.sh     # Returns node external IPs filtered by GCP labels
-│       ├── wait-for-ssh.sh     # Polls until SSH is available on a new node
+│       ├── get-node-ips.sh          # Returns node external IPs filtered by GCP labels
+│       ├── wait-for-ssh.sh          # Polls until SSH is available on a new node
 │       ├── wait-for-convergence.sh  # Waits for Flux kustomizations and Postgres to settle
 │       ├── health-check.sh          # Nodes, pods, and Adminer HTTP 200 assertions
 │       ├── fetch-kubeconfig.sh      # Copies kubeconfig from control plane for CI artifact upload
@@ -92,14 +92,14 @@ enclaive-platform-challenge/
     ├── Security considerations.md     # Secret management, access control, network policies
     ├── Deployment guide.md            # Step-by-step: bootstrap → deploy → verify → day-2
     ├── Technical analysis.md          # Deep dive: every component and every design decision
-    └── Leadership.md                  # Team organisation, multi-env strategy, reliability, security
+    └── Future Enhancements.md         # Improvements for a production-grade deployment
 ```
 
 ---
 
-## ⚡ Quick Start
+## Quick Start
 
-> 📋 **Prerequisites:** `gcloud`, `terraform`, `gh`, and `kubectl` must be installed. See the [Prerequisites section](Documentation/Deployment%20guide.md#-prerequisites) of the Deployment Guide.
+> **Prerequisites:** `gcloud`, `terraform`, `gh`, and `kubectl` must be installed. See the [Prerequisites section](Documentation/Deployment%20guide.md#-prerequisites) of the Deployment Guide.
 
 Two manual steps, then everything is automated:
 
@@ -110,18 +110,18 @@ gcloud auth application-default login
 gh auth login
 
 # 2. Clone and bootstrap
-git clone https://github.com/Gagrio/enclaive-platform-challenge
-cd enclaive-platform-challenge
+git clone https://github.com/Gagrio/gitops-platform
+cd gitops-platform
 bash scripts/bootstrap.sh
 ```
 
 The script handles everything else: GCS state bucket, SSH key pair, `terraform apply` on the bootstrap module, and all GitHub Actions secrets. After it completes, push any change touching `terraform/` or `ansible/` to `main` and CI deploys to dev automatically.
 
-📖 Full instructions: [Documentation/Deployment%20guide.md](Documentation/Deployment%20guide.md)
+Full instructions: [Deployment Guide](Documentation/Deployment%20guide.md)
 
 ---
 
-## 📚 Documentation
+## Documentation
 
 | Document | What it covers |
 |---|---|
@@ -130,31 +130,11 @@ The script handles everything else: GCS state bucket, SSH key pair, `terraform a
 | [Security Considerations](Documentation/Security%20considerations.md) | Secret management, access control, network policies |
 | [Deployment Guide](Documentation/Deployment%20guide.md) | Bootstrap, deploy, verify, day-2 operations, teardown, troubleshooting |
 | [Technical Analysis](Documentation/Technical%20analysis.md) | Design rationale for every component and every decision made |
-| [Leadership Answers](Documentation/Leadership.md) | Team organisation, multi-environment strategy, reliability, security |
+| [Future Enhancements](Documentation/Future%20Enhancements.md) | What would change for a fully production-hardened deployment |
 
 ---
 
-## 🗓️ Timetable
-
-Approximate engineering time per sub-task:
-
-| Sub-task | Time |
-|---|---|
-| Terraform modules (network, node, firewall, gcs, iam) | ~5h |
-| Terraform environments (dev/prod) + bootstrap module | ~2h |
-| Ansible roles (base, kubernetes, security, flux) | ~4h |
-| GitOps structure (Flux bootstrap, kustomizations, sources) | ~2h |
-| CloudNativePG (Cluster CR, ScheduledBackup, ExternalSecrets, PodMonitor) | ~3h |
-| Observability (Prometheus stack, Grafana, Grafana secret via ESO) | ~2h |
-| CI pipelines (repo-checks, validate, deploy + dynamic inventory + smoke test) | ~4h |
-| Bootstrap automation script | ~1h |
-| Documentation (architecture, deployment guide, technical analysis, leadership) | ~4h |
-| Review, bug fixes, iteration | ~3h |
-| **Total** | **~30h** |
-
----
-
-## 🤖 LLM Use
+## LLM Use
 
 **Claude (claude-sonnet-4-6 via Claude Code)** was used throughout this project as a pair programmer — for code generation, review, debugging, and documentation writing.
 
