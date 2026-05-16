@@ -1,4 +1,4 @@
-# Kubernetes GitOps Platform
+# Cloud Native GitOps Platform
 
 A **production-grade GitOps infrastructure platform** that provisions a Kubernetes cluster on Google Cloud, bootstraps it with Ansible, and manages all workloads through Flux. The end state is a platform where no one manually applies Kubernetes manifests — everything is declared in Git and reconciled automatically.
 
