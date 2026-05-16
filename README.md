@@ -31,6 +31,8 @@ Three tiers of automation. After the one-time bootstrap you never touch Terrafor
 
 The normal workflow is: **open a PR → merge → CI and Flux handle everything**.
 
+See [Architecture → CI Pipeline Design](Documentation/Architecture.md#-ci-pipeline-design) for the full workflow breakdown and design rationale.
+
 ---
 
 ## Repository Structure

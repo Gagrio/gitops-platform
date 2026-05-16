@@ -211,7 +211,7 @@ Log in as **admin** with that password. Navigate to **Dashboards → CloudNative
 
 ### 3.5 🖥️ Access Adminer
 
-Adminer is reachable directly in the browser — no port-forwarding needed. ingress-nginx uses `hostPort` mode, binding ports 80 and 443 on whichever node(s) its pod is scheduled on. First check which node has the pod:
+Adminer is reachable directly in the browser — no port-forwarding needed. ingress-nginx uses `hostPort` mode, binding ports 80 and 443 on whichever node(s) its pod is scheduled on (see [Architecture → Ingress and Load Balancing](Architecture.md#-ingress-and-load-balancing)). First check which node has the pod:
 
 ```bash
 kubectl get pod -n ingress-nginx -o wide
@@ -294,6 +294,8 @@ You should see two rows (one for each replica) with `state = streaming`. This co
 3. Merge — CI runs `terraform apply` and Ansible if needed
 
 > ⚠️ Never run `kubectl apply` directly. Any manual change will be overwritten by Flux on the next reconcile.
+
+For upgrade procedures (Postgres, k3s, Flux) and scaling operations, see [Operational Lifecycle](Operational%20lifecycle.md).
 
 ---
 

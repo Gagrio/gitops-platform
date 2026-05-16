@@ -123,14 +123,7 @@ GitHub Actions Environments (`dev` and `prod`) scope deployment jobs to their re
 
 ### 🔥 GCE VPC Firewall
 
-The firewall is the first layer of network security — it controls what traffic reaches the nodes at all:
-
-| Rule | Source | Ports | Reason |
-|---|---|---|---|
-| SSH | `0.0.0.0/0` | 22 | GitHub Actions runners have dynamic IPs — see trade-off note above |
-| Kubernetes API | `admin_cidr` | 6443 | Operator access only; CI uses SSH |
-| HTTP/HTTPS ingress | `0.0.0.0/0` | 80, 443 | Public-facing application traffic |
-| Internal cluster | `subnet_cidr` | all | k3s, Flannel CNI, and kubelet need unrestricted intra-node communication |
+The firewall is the first layer of network security — it controls what traffic reaches the nodes at all. See [Architecture → Firewall Design](Architecture.md#-firewall-design) for the full rule table and per-rule rationale.
 
 ### 🔄 Intra-cluster traffic (Flannel CNI)
 
