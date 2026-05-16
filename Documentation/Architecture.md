@@ -7,9 +7,9 @@
 │                            GIT REPOSITORY (GitHub)                              │
 │                                                                                 │
 │   terraform/           ansible/           gitops/            Documentation/     │
-│   ├── modules/         ├── roles/         ├── clusters/       ├── Architecture   │
-│   │   ├── network      │   ├── base       │   ├── dev/        ├── Operations     │
-│   │   ├── node         │   ├── kubernetes │   └── prod/       └── Security       │
+│   ├── modules/         ├── roles/         ├── clusters/       ├── Architecture  │
+│   │   ├── network      │   ├── base       │   ├── dev/        ├── Operations    │
+│   │   ├── node         │   ├── kubernetes │   └── prod/       └── Security      │
 │   │   └── firewall     │   └── security   ├── operators/                        │
 │   └── environments/    └── playbooks/     │   ├── eso-config/                   │
 │       ├── dev/             bootstrap.yml  │   ├── monitoring/                   │
@@ -30,14 +30,14 @@
 ┌──────────────────────────────────────────────────────────┐
 │                      GOOGLE CLOUD (GCE)                  │
 │                                                          │
-│   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐   │
-│   │   node-01   │   │   node-02   │   │   node-03   │   │
-│   │  (control)  │   │  (worker)   │   │  (worker)   │   │
-│   │             │   │             │   │             │   │
-│   │  k3s server │   │  k3s agent  │   │  k3s agent  │   │
-│   │  flux-system│   │             │   │             │   │
-│   └──────┬──────┘   └──────┬──────┘   └──────┬──────┘   │
-│          └─────────────────┴─────────────────┘          │
+│   ┌─────────────┐   ┌─────────────┐   ┌─────────────┐    │
+│   │   node-01   │   │   node-02   │   │   node-03   │    │
+│   │  (control)  │   │  (worker)   │   │  (worker)   │    │
+│   │             │   │             │   │             │    │
+│   │  k3s server │   │  k3s agent  │   │  k3s agent  │    │
+│   │  flux-system│   │             │   │             │    │
+│   └──────┬──────┘   └──────┬──────┘   └──────┬──────┘    │
+│          └─────────────────┴─────────────────┘           │
 │                        Flannel CNI                       │
 │                   NetworkPolicies declared*              │
 │                                                          │
