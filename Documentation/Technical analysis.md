@@ -171,11 +171,29 @@ All other ingress is denied by default.
 
 ### What it is
 
-The requirement is to deploy something that connects to the operator-managed database and is managed via GitOps. No custom application needs to be built. We use **Adminer** — a single, lightweight Docker image that provides a full database UI and immediately demonstrates a working Postgres connection. It satisfies the requirement without writing any application code.
+The goal of this layer is to prove the platform works end-to-end: something running in the cluster, connecting to the operator-managed database, reachable from outside. We use **Adminer** — a single, self-contained Docker image that provides a full database UI and immediately demonstrates a working Postgres connection without requiring any application code to be written or maintained.
+
+Adminer was chosen deliberately for this scope:
+
+- **Zero custom code** — the focus of this platform is infrastructure, not application development. Writing and maintaining a bespoke REST API would add noise without adding signal.
+- **Immediately interactive** — anyone who clones the repo and follows the deployment guide can open a browser, run SQL, and verify the full stack is working in under a minute. No API client needed.
+- **Operator-aware** — Adminer is pre-configured to connect to the CloudNativePG read-write service (`pg-rw.postgres.svc.cluster.local`), so it transparently follows primary failover without any reconfiguration.
+
+### Alternatives
+
+Any stateless application that speaks Postgres can replace Adminer in `gitops/applications/demo-app/` with no changes to the platform. Some options worth considering depending on what you want to demonstrate:
+
+| Alternative | Why you'd use it |
+|---|---|
+| **[Hasura](https://hasura.io/)** | Instantly turns the Postgres schema into a GraphQL API — great for showing off a more realistic backend with minimal code |
+| **[PostgREST](https://postgrest.org/)** | Exposes the database as a REST API automatically — zero application code, more production-like interface than Adminer |
+| **[pgAdmin](https://www.pgadmin.org/)** | Heavier but richer database management UI — better for teams that want a full DBA tool rather than a lightweight query interface |
+| **A custom REST API** | Maximum control — a small Go or Python service with `/healthz`, `POST /items`, `GET /items` would demonstrate the full GitOps application lifecycle including image builds and custom Dockerfiles |
+| **[Metabase](https://www.metabase.com/)** | Business intelligence UI — shows the platform supporting analytics workloads on top of the same Postgres cluster |
 
 ### How it's deployed
 
-Adminer is defined as a `Deployment` and `Service` in `gitops/applications/demo-app/`. Flux reconciles it the same way it reconciles everything else. The Postgres server address is pre-configured via an environment variable pointing to the CloudNativePG read-write service.
+Adminer is defined as a `Deployment`, `Service`, and `Ingress` in `gitops/applications/demo-app/`. Flux reconciles it the same way it reconciles everything else. The Postgres server address is pre-configured via an environment variable pointing to the CloudNativePG read-write service.
 
 ---
 
