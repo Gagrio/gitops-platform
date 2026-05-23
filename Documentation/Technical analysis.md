@@ -85,7 +85,7 @@ No engineer runs `kubectl apply` to deploy things. They open a PR, get it review
 
 ### 🤔 Why Flux over ArgoCD?
 
-The challenge lists ArgoCD as the preferred option. We chose Flux because it integrates more naturally with the Ansible bootstrap pattern — Flux can be fully installed and configured via `flux bootstrap github` in the Ansible `flux` role, without needing a separate running cluster or a third CI job. The end result is identical: a GitOps loop that keeps the cluster in sync with the repository.
+ArgoCD is a common alternative, but Flux integrates more naturally with the Ansible bootstrap pattern — it can be fully installed and configured via `flux bootstrap github` in the Ansible `flux` role, without needing a separate running cluster or a third CI job. The end result is identical: a GitOps loop that keeps the cluster in sync with the repository.
 
 ### 🗂️ What Flux reconciles
 

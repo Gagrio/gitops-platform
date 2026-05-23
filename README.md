@@ -2,6 +2,16 @@
 
 A **production-grade GitOps infrastructure platform** that provisions a Kubernetes cluster on Google Cloud, bootstraps it with Ansible, and manages all workloads through Flux. The end state is a platform where no one manually applies Kubernetes manifests — everything is declared in Git and reconciled automatically.
 
+**Start here:**
+
+| I want to... | Go to |
+|---|---|
+| Understand the architecture | [Architecture.md](Documentation/Architecture.md) |
+| Deploy it myself | [Deployment guide.md](Documentation/Deployment%20guide.md) |
+| Understand every design decision | [Technical analysis.md](Documentation/Technical%20analysis.md) |
+| Review the security posture | [Security considerations.md](Documentation/Security%20considerations.md) |
+| See day-2 operations (backup, upgrades, scaling) | [Operational lifecycle.md](Documentation/Operational%20lifecycle.md) |
+
 ---
 
 ## What It Builds

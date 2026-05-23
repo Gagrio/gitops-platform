@@ -2,7 +2,7 @@
 flux_version: "2.8.6"
 flux_namespace: flux-system
 github_owner: Gagrio
-github_repo: enclaive-platform-challenge
+github_repo: gitops-platform
 kubeconfig_path: /etc/rancher/k3s/k3s.yaml
 
 # Injected by CI via --extra-vars
@@ -13,7 +13,7 @@ gitops_branch: main
 # Each environment has its own Flux entry point in the gitops/ tree
 gitops_path: "gitops/clusters/{{ cluster_env }}"
 # Kubeconfig artifact path includes environment name for clarity
-kubeconfig_artifact_path: "/tmp/kubeconfig-enclaive-{{ cluster_env }}"
+kubeconfig_artifact_path: "/tmp/kubeconfig-gitops-{{ cluster_env }}"
 
 # Region defaults to europe-west1; can be overridden per environment via --extra-vars
 # if dev and prod need to run in different regions

@@ -80,8 +80,8 @@ jobs:
       - name: Write SSH private key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/enclaive-ci
-          chmod 600 ~/.ssh/enclaive-ci
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/gitops-ci
+          chmod 600 ~/.ssh/gitops-ci
 
       - name: Get control plane IP
         id: cp-ip
@@ -89,7 +89,7 @@ jobs:
 
       - name: Wait for Flux convergence and Postgres bootstrap
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/gitops-ci \
             ubuntu@${{ steps.cp-ip.outputs.ip }} \
             bash < scripts/ci/wait-for-convergence.sh
 
@@ -121,8 +121,8 @@ jobs:
       - name: Write SSH private key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/enclaive-ci
-          chmod 600 ~/.ssh/enclaive-ci
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/gitops-ci
+          chmod 600 ~/.ssh/gitops-ci
 
       - name: Get control plane IP
         id: cp-ip
@@ -134,6 +134,6 @@ jobs:
 
       - name: Run health checks
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci \
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/gitops-ci \
             ubuntu@${{ steps.cp-ip.outputs.ip }} \
             "ENVIRONMENT=${{ env.ENVIRONMENT }} NODE_IPS='${{ steps.all-ips.outputs.ips }}' bash -s" < scripts/ci/health-check.sh

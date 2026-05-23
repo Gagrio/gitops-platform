@@ -64,7 +64,7 @@ Downloads the Flux CLI binary, waits for the cluster API to be reachable, and ru
 - `cluster-global` — `GCP_PROJECT_ID` (same across all environments in this project)
 - `cluster-vars` — `ENVIRONMENT`, `REGION`, and `STORAGE_CLASS` (per-environment; currently `local-path` for all environments — the k3s built-in provisioner; switching to a GCE PD-backed StorageClass requires installing the GCE CSI driver separately)
 
-Finally, it copies the kubeconfig to `/tmp/kubeconfig-enclaive-dev` so the CI job can upload it as an artifact.
+Finally, it copies the kubeconfig to `/tmp/kubeconfig-gitops-dev` so the CI job can upload it as an artifact.
 
 ## Inventory
 

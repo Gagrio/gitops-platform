@@ -11,8 +11,8 @@
 #   REGION          — GCP region (default: europe-west1)
 #   TF_STATE_BUCKET — GCS bucket name (default: <project-id>-tfstate)
 #   ADMIN_CIDR      — CIDR for k8s API access (default: your current public IP/32)
-#   GITHUB_REPO     — repository name (default: enclaive-platform-challenge)
-#   SSH_KEY_PATH    — path to SSH key (default: ~/.ssh/enclaive-ci)
+#   GITHUB_REPO     — repository name (default: gitops-platform)
+#   SSH_KEY_PATH    — path to SSH key (default: ~/.ssh/gitops-ci)
 
 set -euo pipefail
 
@@ -59,10 +59,10 @@ info "Admin CIDR:     $ADMIN_CIDR (k8s API access — override with ADMIN_CIDR e
 GITHUB_OWNER=$(gh api user --jq .login)
 info "GitHub owner:   $GITHUB_OWNER"
 
-GITHUB_REPO="${GITHUB_REPO:-enclaive-platform-challenge}"
+GITHUB_REPO="${GITHUB_REPO:-gitops-platform}"
 info "GitHub repo:    $GITHUB_REPO"
 
-SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/.ssh/enclaive-ci}"
+SSH_KEY_PATH="${SSH_KEY_PATH:-$HOME/.ssh/gitops-ci}"
 
 # ── GCS state bucket ──────────────────────────────────────────────────────────
 step "Creating Terraform state bucket"

@@ -110,8 +110,8 @@ jobs:
       - name: Write SSH private key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/enclaive-ci
-          chmod 600 ~/.ssh/enclaive-ci
+          echo "${{ secrets.SSH_PRIVATE_KEY }}" > ~/.ssh/gitops-ci
+          chmod 600 ~/.ssh/gitops-ci
 
       - name: Wait for SSH on all nodes
         run: bash scripts/ci/wait-for-ssh.sh
@@ -141,6 +141,6 @@ jobs:
 
       - uses: actions/upload-artifact@v4
         with:
-          name: kubeconfig-enclaive-${{ env.ENVIRONMENT }}
-          path: /tmp/kubeconfig-enclaive-${{ env.ENVIRONMENT }}
+          name: kubeconfig-gitops-${{ env.ENVIRONMENT }}
+          path: /tmp/kubeconfig-gitops-${{ env.ENVIRONMENT }}
           retention-days: 7

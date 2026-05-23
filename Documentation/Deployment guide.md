@@ -69,8 +69,8 @@ gh auth login
 ### 1.2 📥 Clone the Repository
 
 ```bash
-git clone https://github.com/<your-github-username>/enclaive-platform-challenge
-cd enclaive-platform-challenge
+git clone https://github.com/<your-github-username>/gitops-platform
+cd gitops-platform
 ```
 
 > **Note:** The `github_owner` used for Flux bootstrap is derived automatically from `github.repository_owner` in CI — no hardcoding needed. If you fork this repo, CI picks up your username automatically.
@@ -88,7 +88,7 @@ bash scripts/bootstrap.sh
 What it does:
 
 1. Creates the Terraform state bucket in GCS
-2. Generates an SSH key pair at `~/.ssh/enclaive-ci`
+2. Generates an SSH key pair at `~/.ssh/gitops-ci`
 3. Writes `terraform/bootstrap/terraform.tfvars` (gitignored)
 4. Runs `terraform apply` on the bootstrap module — creates the CI identity, Workload Identity Federation, and populates all GitHub Actions secrets
 5. Sets `SSH_PRIVATE_KEY` in GitHub secrets via `gh secret set` — the private key never passes through Terraform state
@@ -147,12 +147,12 @@ The Ansible playbook fetches the kubeconfig from the control plane and uploads i
 1. Go to your repository on GitHub → **Actions**
 2. Click the completed deploy run
 3. Scroll to **Artifacts** at the bottom of the run page
-4. Download `kubeconfig-enclaive-<environment>` and save it to `~/.kube/config-enclaive-<environment>`
+4. Download `kubeconfig-gitops-<environment>` and save it to `~/.kube/config-gitops-<environment>`
 
 Then point kubectl at it:
 
 ```bash
-export KUBECONFIG=~/.kube/config-enclaive-<environment>
+export KUBECONFIG=~/.kube/config-gitops-<environment>
 ```
 
 > The API server (port 6443) is restricted to your `ADMIN_CIDR` by the GCP firewall. If kubectl times out, confirm your current IP matches the CIDR you used during bootstrap.
@@ -322,7 +322,7 @@ The bootstrap state lives in the same GCS bucket under the `bootstrap` prefix an
 |---|---|---|
 | Bootstrap `terraform apply` fails with permission error | ADC not set or wrong project | Re-run step 1.1 |
 | CI fails with WIF authentication error | WIF provider not configured | Re-run bootstrap `terraform apply` |
-| CI fails at `ansible-playbook` | SSH key mismatch | Confirm `SSH_PRIVATE_KEY` secret matches `~/.ssh/enclaive-ci` |
+| CI fails at `ansible-playbook` | SSH key mismatch | Confirm `SSH_PRIVATE_KEY` secret matches `~/.ssh/gitops-ci` |
 | Node not `Ready` | k3s failed to start | SSH into node: `sudo systemctl status k3s` or `sudo systemctl status k3s-agent` |
 | `common` kustomization stuck | HelmRelease install slow on first run | Check: `flux logs --kind=Kustomization --name=common -n flux-system` and `kubectl get helmrelease -A` |
 | `eso-config` kustomization stuck | ESO not yet running or CRD missing | Wait for `common` first; check ESO pod: `kubectl get pods -n external-secrets` |
@@ -336,5 +336,5 @@ The bootstrap state lives in the same GCS bucket under the `bootstrap` prefix an
 | WAL archiving fails: `403 storage.buckets.get access denied` | Node SA missing `roles/storage.legacyBucketReader` on the backup bucket | Run `terraform apply` — the gcs module now grants both `objectAdmin` and `legacyBucketReader`; or add the role manually via `gcloud storage buckets add-iam-policy-binding` |
 | Adminer not reachable in browser | ingress-nginx pod not on that node | Check which nodes have the pod: `kubectl get pod -n ingress-nginx -o wide`; use that node's external IP |
 | kubectl connection refused or times out | API server port (6443) firewalled | Confirm your current IP matches `ADMIN_CIDR` used during bootstrap |
-| kubeconfig artifact empty | scp step failed | SSH to control plane manually: `scp ubuntu@<cp-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/config-enclaive-<environment>` |
+| kubeconfig artifact empty | scp step failed | SSH to control plane manually: `scp ubuntu@<cp-ip>:/etc/rancher/k3s/k3s.yaml ~/.kube/config-gitops-<environment>` |
 | Cannot retrieve app password | Secret Manager access | Run `gcloud secrets versions access latest --secret=<environment>-pg-app-password` |

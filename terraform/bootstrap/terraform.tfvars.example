@@ -4,14 +4,14 @@
 project_id      = "your-gcp-project-id"
 region          = "europe-west1"
 github_owner    = "your-github-username"
-github_repo     = "enclaive-platform-challenge"
+github_repo     = "gitops-platform"
 tf_state_bucket = "your-project-id-tfstate"
 
 # Your current public IP — find it with: curl ifconfig.me
 # Append /32 for a single-host CIDR, e.g. 203.0.113.10/32
 admin_cidr = "203.0.113.10/32"
 
-# Contents of ~/.ssh/enclaive-ci.pub (the public key — not sensitive)
+# Contents of ~/.ssh/gitops-ci.pub (the public key — not sensitive)
 ssh_public_key = "ssh-rsa AAAA..."
 
 # GitHub personal access token with repo scope

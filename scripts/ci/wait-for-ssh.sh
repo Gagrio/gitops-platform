@@ -9,7 +9,7 @@ for ip in $(gcloud compute instances list \
   --format="get(networkInterfaces[0].accessConfigs[0].natIP)"); do
   echo "Waiting for SSH on $ip..."
   timeout 120 bash -c \
-    "until ssh -o StrictHostKeyChecking=no -i ~/.ssh/enclaive-ci ubuntu@$ip 'echo ok' 2>/dev/null; \
+    "until ssh -o StrictHostKeyChecking=no -i ~/.ssh/gitops-ci ubuntu@$ip 'echo ok' 2>/dev/null; \
      do sleep 5; done"
   echo "  ✓ $ip"
 done

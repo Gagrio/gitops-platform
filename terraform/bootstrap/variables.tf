@@ -21,7 +21,7 @@ variable "github_owner" {
 
 variable "github_repo" {
   type    = string
-  default = "enclaive-platform-challenge"
+  default = "gitops-platform"
 }
 
 variable "tf_state_bucket" {
@@ -36,5 +36,5 @@ variable "admin_cidr" {
 
 variable "ssh_public_key" {
   type        = string
-  description = "Contents of the SSH public key file (~/.ssh/enclaive-ci.pub) — injected into GCE nodes"
+  description = "Contents of the SSH public key file (~/.ssh/gitops-ci.pub) — injected into GCE nodes"
 }
